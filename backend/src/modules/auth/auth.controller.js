@@ -2,12 +2,33 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../../config/db');
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 6;
+
 // POST /api/v1/auth/register (เพิ่มเพื่อใช้สร้างผู้ใช้ใหม่ตาม GAP-01)
 const register = async (req, res) => {
   const { email, password, display_name, role } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ success: false, message: 'Email and password are required' });
+  }
+
+  if (typeof email !== 'string' || email.length > 255 || !EMAIL_PATTERN.test(email)) {
+    return res.status(400).json({ success: false, message: 'Email format is invalid' });
+  }
+
+  // ให้ตรงกับ minLength={6} ในฟอร์มสมัครของ frontend
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({
+      success: false,
+      message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    });
+  }
+
+  // ความยาวตาม users.display_name VARCHAR(150)
+  if (display_name !== undefined && display_name !== null &&
+      (typeof display_name !== 'string' || display_name.length > 150)) {
+    return res.status(400).json({ success: false, message: 'Display name must be text up to 150 characters' });
   }
 
   // อนุญาตให้สมัครเป็น CITIZEN หรือ MERCHANT (ADMIN ไม่อนุญาตให้สมัครแบบ Public)

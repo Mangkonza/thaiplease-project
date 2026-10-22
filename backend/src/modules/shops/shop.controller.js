@@ -1,6 +1,6 @@
 const db = require('../../config/db');
 
-// POST /api/v1/shops (สร้างร้านค้าใหม่โดย Merchant)
+// POST /api/v1/shops (สร้างร้านค้าใหม่โดย Merchant; ร้านใหม่ต้องรอ Admin อนุมัติก่อนเป็น ACTIVE)
 const createShop = async (req, res) => {
   const { name, category, area, description } = req.body;
   const owner_id = req.user.user_id;
@@ -12,14 +12,14 @@ const createShop = async (req, res) => {
   try {
     const result = await db.query(
       `INSERT INTO shops (owner_id, name, category, area, description, status)
-       VALUES ($1, $2, $3, $4, $5, 'ACTIVE')
+       VALUES ($1, $2, $3, $4, $5, 'PENDING')
        RETURNING *`,
       [owner_id, name, category || null, area || null, description || null]
     );
 
     return res.status(201).json({
       success: true,
-      message: 'Shop created successfully',
+      message: 'Shop created and pending admin approval',
       shop: result.rows[0],
     });
   } catch (error) {
