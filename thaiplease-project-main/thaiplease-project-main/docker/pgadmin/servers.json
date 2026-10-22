@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "ThaiPlease DB",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "thaiplease_db",
+      "Username": "thaiplease_user",
+      "Password": "thaiplease_password123",
+      "SSLMode": "prefer"
+    }
+  }
+}
