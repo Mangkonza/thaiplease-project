@@ -61,4 +61,5 @@ const verifyShopOwner = async (req, res, next) => {
 
 module.exports = {
   verifyShopOwner,
+  UUID_PATTERN,
 };

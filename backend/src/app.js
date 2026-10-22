@@ -6,6 +6,7 @@ const db = require('./config/db');
 const authRoutes = require('./modules/auth/auth.routes');
 const shopRoutes = require('./modules/shops/shop.routes');
 const analyticsRoutes = require('./modules/analytics/analytics.routes');
+const aiReportRoutes = require('./modules/ai-reports/ai-report.routes');
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.get('/health', async (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/shops', shopRoutes);
 app.use('/api/v1/shops', analyticsRoutes);
+app.use('/api/v1', aiReportRoutes);
 
 // Error Handling กรณีหา Endpoint ไม่เจอ (404)
 app.use((req, res) => {

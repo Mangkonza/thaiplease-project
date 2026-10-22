@@ -8,6 +8,11 @@ const jwt = require('jsonwebtoken');
 const db = require('../src/config/db');
 const app = require('../src/app');
 
+// db.js โหลด backend/.env ด้วย dotenv จึงต้องล้างค่า AI จริงออก ไม่ให้ test ใช้ key จริงหรือยิง AI จริง
+for (const key of Object.keys(process.env)) {
+  if (key.startsWith('AI_')) delete process.env[key];
+}
+
 // เปิด server ชั่วคราวบน port สุ่ม แล้วคืนฟังก์ชันสำหรับยิง request
 async function startServer() {
   const server = await new Promise((resolve) => {
