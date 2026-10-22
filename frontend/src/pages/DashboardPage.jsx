@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { Store, LogOut, MapPin, Tag, PlusCircle, RefreshCw } from 'lucide-react';
 
@@ -134,9 +134,9 @@ export default function DashboardPage() {
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                   <span>ID: {shop.shop_id.slice(0, 8)}...</span>
-                  <span className="text-indigo-600 font-semibold cursor-pointer hover:underline">
+                  <Link to={`/shops/${shop.shop_id}`} className="text-indigo-600 font-semibold hover:underline">
                     ดูภาพรวมยอดขาย &rarr;
-                  </span>
+                  </Link>
                 </div>
               </div>
             ))}
