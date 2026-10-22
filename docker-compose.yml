@@ -9,7 +9,8 @@ services:
       POSTGRES_DB: thaiplease_db
       TZ: Asia/Bangkok
     ports:
-      - "5432:5432"
+      # ใช้ 5433 บนเครื่อง เพราะ 5432 มักชนกับ PostgreSQL ที่ติดตั้งบน Windows อยู่แล้ว
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql
