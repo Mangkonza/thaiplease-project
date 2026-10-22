@@ -248,6 +248,8 @@ describe('GET /ai-reports/:reportId', () => {
     assert.equal(own.status, 200);
     assert.equal(own.body.report.suggestions.length, 3);
     assert.equal(own.body.report.problem, 'ลูกค้าใหม่ลดลงจาก 4 เหลือ 1 คน');
+    // 4 และ 1 คือลูกค้าใหม่สัปดาห์ก่อนและสัปดาห์นี้ใน metrics_snapshot
+    assert.deepEqual(own.body.report.number_check, { checked: 2, unverified: [] });
 
     assert.equal((await api.request('GET', `/api/v1/ai-reports/${REPORT_ID}`, { token: tokenFor('ADMIN', OTHER_ID) })).status, 200);
     assert.equal((await api.request('GET', `/api/v1/ai-reports/${REPORT_ID}`, { token: tokenFor('MERCHANT', OTHER_ID) })).status, 403);

@@ -2,6 +2,7 @@ const db = require('../../config/db');
 const analyticsService = require('../analytics/analytics.service');
 const aiClient = require('./ai.client');
 const contract = require('./ai-report.contract');
+const { checkReportNumbers } = require('./ai-report.numbers');
 
 class InsufficientDataError extends Error {
   constructor(dashboard) {
@@ -135,6 +136,7 @@ async function getReportById(reportId) {
     created_at: row.created_at,
     suggestions: suggestionResult.rows,
   };
+  report.number_check = checkReportNumbers(report);
   return { owner_id: row.owner_id, report };
 }
 
