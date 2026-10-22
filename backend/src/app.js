@@ -5,6 +5,7 @@ const db = require('./config/db');
 // โหลด Routes
 const authRoutes = require('./modules/auth/auth.routes');
 const shopRoutes = require('./modules/shops/shop.routes');
+const analyticsRoutes = require('./modules/analytics/analytics.routes');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.get('/health', async (req, res) => {
 // ผูก Module Routes ตาม Prefix ใน SRS (/api/v1)
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/shops', shopRoutes);
+app.use('/api/v1/shops', analyticsRoutes);
 
 // Error Handling กรณีหา Endpoint ไม่เจอ (404)
 app.use((req, res) => {
