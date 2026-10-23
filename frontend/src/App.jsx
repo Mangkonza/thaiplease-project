@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import ShopDashboardPage from './pages/ShopDashboardPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -17,6 +18,16 @@ function App() {
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ภาพรวมยอดขายและ AI Shop Advisor ของร้าน (UC-02, UC-03) */}
+        <Route
+          path="/shops/:shopId"
+          element={
+            <ProtectedRoute>
+              <ShopDashboardPage />
             </ProtectedRoute>
           }
         />
