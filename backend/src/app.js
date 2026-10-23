@@ -7,6 +7,10 @@ const authRoutes = require('./modules/auth/auth.routes');
 const shopRoutes = require('./modules/shops/shop.routes');
 const analyticsRoutes = require('./modules/analytics/analytics.routes');
 const aiReportRoutes = require('./modules/ai-reports/ai-report.routes');
+const paymentRoutes = require('./modules/payments/payment.routes');
+const coinRoutes = require('./modules/coins/coin.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
+const campaignRoutes = require('./modules/campaigns/campaign.routes');
 
 const app = express();
 
@@ -33,6 +37,10 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/shops', shopRoutes);
 app.use('/api/v1/shops', analyticsRoutes);
 app.use('/api/v1', aiReportRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/users/me', coinRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1', campaignRoutes);
 
 // Error Handling กรณีหา Endpoint ไม่เจอ (404)
 app.use((req, res) => {

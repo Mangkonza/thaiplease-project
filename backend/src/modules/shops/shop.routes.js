@@ -13,6 +13,9 @@ router.get('/my', authenticateToken, authorizeRole('MERCHANT', 'ADMIN'), shopCon
 // Protected route: สร้างร้านค้าใหม่ (เฉพาะ MERCHANT หรือ ADMIN)
 router.post('/', authenticateToken, authorizeRole('MERCHANT', 'ADMIN'), shopController.createShop);
 
+// Public storefront details for active shops.
+router.get('/public/:shopId', shopController.getPublicShopById);
+
 // Protected route: อ่านข้อมูลร้านค้าตาม shopId (ตรวจสอบสิทธิ์เจ้าของร้านตาม BR-04)
 router.get('/:shopId', authenticateToken, verifyShopOwner, shopController.getShopById);
 

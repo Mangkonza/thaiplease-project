@@ -1,4 +1,27 @@
 const db = require('../../config/db');
+const { UUID_PATTERN } = require('../../middlewares/shop.middleware');
+
+// Public storefront view is limited to approved shops; the existing owner endpoint remains protected.
+const getPublicShopById = async (req, res) => {
+  const { shopId } = req.params;
+  if (!UUID_PATTERN.test(shopId)) {
+    return res.status(400).json({ success: false, message: 'Shop ID must be a valid UUID' });
+  }
+  try {
+    const result = await db.query(
+      `SELECT shop_id, name, category, area, description, status
+       FROM shops WHERE shop_id = $1 AND status = 'ACTIVE'`,
+      [shopId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Shop not found' });
+    }
+    return res.json({ success: true, shop: result.rows[0] });
+  } catch (error) {
+    console.error('Get public shop error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
 
 // POST /api/v1/shops (สร้างร้านค้าใหม่โดย Merchant; ร้านใหม่ต้องรอ Admin อนุมัติก่อนเป็น ACTIVE)
 const createShop = async (req, res) => {
@@ -114,6 +137,7 @@ const getAllShops = async (req, res) => {
 };
 
 module.exports = {
+  getPublicShopById,
   createShop,
   getShopById,
   getMyShops,
