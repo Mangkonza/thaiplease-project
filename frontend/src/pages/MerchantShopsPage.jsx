@@ -15,6 +15,7 @@ export default function MerchantShopsPage() {
     const { data } = await api.get('/shops/my');
     setShops(data.shops);
   }
+
   useEffect(() => {
     api.get('/shops/my')
       .then(({ data }) => setShops(data.shops))
@@ -40,23 +41,98 @@ export default function MerchantShopsPage() {
 
   return (
     <div className="content-stack">
-      <div className="section-heading"><div><span className="eyebrow">MERCHANT SPACE</span><h1>จัดการร้านของคุณ</h1><p className="muted">เพิ่มร้าน รออนุมัติ และจัดการแคมเปญสำหรับร้านที่เปิดใช้งาน</p></div></div>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">MERCHANT SPACE</span>
+          <h1>จัดการร้านของคุณ</h1>
+          <p className="muted">เพิ่มร้าน รออนุมัติ และจัดการแคมเปญสำหรับร้านที่เปิดใช้งาน</p>
+        </div>
+      </div>
+
       {error && <p className="notice notice-error" role="alert">{error}</p>}
       {notice && <p className="notice notice-success" role="status">{notice}</p>}
+
       <div className="merchant-layout">
-        <section className="card"><span className="eyebrow">YOUR STORES</span><h2>ร้านค้าของฉัน</h2>
-          {shops.length ? <div className="list-rows">{shops.map((shop) => <article className="list-row merchant-shop" key={shop.shop_id}>
-            <div><strong>{shop.name}</strong><small>{shop.category || 'ร้านค้า'} · {shop.area || 'ไม่ระบุพื้นที่'}</small><StatusBadge status={shop.status} /></div>
-            {shop.status === 'ACTIVE' ? <Link className="button button-outline button-small" to={`/merchant/shops/${shop.shop_id}/campaigns`}>จัดการแคมเปญ</Link> : <span className="muted small-text">รอเปิดใช้งาน</span>}
-          </article>)}</div> : <p className="empty-note">ยังไม่มีร้านค้า เริ่มต้นสร้างร้านของคุณได้เลย</p>}
+        <section className="card">
+          <span className="eyebrow">YOUR STORES</span>
+          <h2>ร้านค้าของฉัน</h2>
+          {shops.length ? (
+            <div className="list-rows">
+              {shops.map((shop) => (
+                <article className="list-row merchant-shop" key={shop.shop_id}>
+                  <div>
+                    <strong>{shop.name}</strong>
+                    <small>{shop.category || 'ร้านค้า'} · {shop.area || 'ไม่ระบุพื้นที่'}</small>
+                    <StatusBadge status={shop.status} />
+                  </div>
+                  {shop.status === 'ACTIVE' ? (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <Link
+                        className="button button-outline button-small"
+                        to={`/merchant/shops/${shop.shop_id}/dashboard`}
+                      >
+                        ดูยอดขาย
+                      </Link>
+                      <Link
+                        className="button button-outline button-small"
+                        to={`/merchant/shops/${shop.shop_id}/campaigns`}
+                      >
+                        จัดการแคมเปญ
+                      </Link>
+                    </div>
+                  ) : (
+                    <span className="muted small-text">รอเปิดใช้งาน</span>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-note">ยังไม่มีร้านค้า เริ่มต้นสร้างร้านของคุณได้เลย</p>
+          )}
         </section>
-        <form className="card form-stack" onSubmit={createShop}><span className="eyebrow">NEW STORE</span><h2>สร้างร้านใหม่</h2>
-          <label>ชื่อร้าน *<input required maxLength="150" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>หมวดหมู่<input maxLength="100" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="เช่น คาเฟ่" /></label>
-          <label>พื้นที่<input maxLength="150" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} placeholder="เช่น บางเขน" /></label>
-          <label>รายละเอียด<textarea rows="3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
+
+        <form className="card form-stack" onSubmit={createShop}>
+          <span className="eyebrow">NEW STORE</span>
+          <h2>สร้างร้านใหม่</h2>
+          <label>
+            ชื่อร้าน *
+            <input
+              required
+              maxLength="150"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </label>
+          <label>
+            หมวดหมู่
+            <input
+              maxLength="100"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              placeholder="เช่น คาเฟ่"
+            />
+          </label>
+          <label>
+            พื้นที่
+            <input
+              maxLength="150"
+              value={form.area}
+              onChange={(e) => setForm({ ...form, area: e.target.value })}
+              placeholder="เช่น บางเขน"
+            />
+          </label>
+          <label>
+            รายละเอียด
+            <textarea
+              rows="3"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </label>
           <p className="fine-print">ร้านใหม่จะอยู่ในสถานะรออนุมัติก่อนเปิดให้บริการ</p>
-          <button className="button button-primary" disabled={busy}>{busy ? 'กำลังบันทึก…' : 'ส่งคำขอสร้างร้าน'}</button>
+          <button className="button button-primary" disabled={busy}>
+            {busy ? 'กำลังบันทึก…' : 'ส่งคำขอสร้างร้าน'}
+          </button>
         </form>
       </div>
     </div>

@@ -9,7 +9,7 @@ services:
       POSTGRES_DB: thaiplease_db
       TZ: Asia/Bangkok
     ports:
-      # ใช้ 5433 บนเครื่อง เพราะ 5432 มักชนกับ PostgreSQL ที่ติดตั้งบน Windows อยู่แล้ว
+      # ใช้ 5433 บนเครื่อง Host เพื่อไม่ให้ชนกับ PostgreSQL ที่ติดตั้งบนเครื่อง
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -29,6 +29,9 @@ services:
       PGADMIN_DEFAULT_PASSWORD: adminpassword123
     ports:
       - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
     depends_on:
       postgres:
         condition: service_healthy
