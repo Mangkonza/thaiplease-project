@@ -30,6 +30,16 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
+// ตรวจสอบและเปิดใช้งาน Extension pg_trgm อัตโนมัติสำหรับระบบค้นหา
+(async () => {
+  try {
+    await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
+    console.log('✅ PostgreSQL pg_trgm extension is ready');
+  } catch (err) {
+    console.error('⚠️ Failed to initialize pg_trgm extension:', err.message);
+  }
+})();
+
 module.exports = {
   query: (text, params) => pool.query(text, params),
   pool,

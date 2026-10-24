@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Store, LogOut, MapPin, Tag, PlusCircle, RefreshCw } from 'lucide-react';
+import { Store, LogOut, MapPin, Tag, RefreshCw } from 'lucide-react';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -11,7 +11,7 @@ export default function DashboardPage() {
 
   // ดึงข้อมูลเมื่อเปิดหน้าเว็บ
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = localStorage.getItem('thaiplease_user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
@@ -37,8 +37,8 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem('thaiplease_token');
+    localStorage.removeItem('thaiplease_user');
     navigate('/login');
   };
 
@@ -134,7 +134,10 @@ export default function DashboardPage() {
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                   <span>ID: {shop.shop_id.slice(0, 8)}...</span>
-                  <Link to={`/shops/${shop.shop_id}`} className="text-indigo-600 font-semibold hover:underline">
+                  <Link
+                    to={`/merchant/shops/${shop.shop_id}/dashboard`}
+                    className="text-indigo-600 font-semibold hover:underline"
+                  >
                     ดูภาพรวมยอดขาย &rarr;
                   </Link>
                 </div>

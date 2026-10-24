@@ -1,13 +1,29 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, BadgeCheck, ChevronLeft, ChevronRight, LoaderCircle, LogOut, RefreshCw,
-  ShieldCheck, Sparkles, Store, Target, TriangleAlert,
+  ArrowLeft,
+  BadgeCheck,
+  ChevronLeft,
+  ChevronRight,
+  LoaderCircle,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  Target,
+  TriangleAlert,
 } from 'lucide-react';
 import api from '../services/api';
 import {
-  aiErrorMessage, bangkokToday, describeKpi, describeParameters, formatChange,
-  formatDateTime, formatNumber, formatPeriod, shiftDate,
+  aiErrorMessage,
+  bangkokToday,
+  describeKpi,
+  describeParameters,
+  formatChange,
+  formatDateTime,
+  formatNumber,
+  formatPeriod,
+  shiftDate,
 } from '../utils/format';
 
 const METRIC_CARDS = [
@@ -25,17 +41,41 @@ const PERIOD_TABS = [
 ];
 
 function MetricCard({ label, unit, value, previous, change, previousLabel }) {
-  const tone = change > 0 ? 'text-emerald-600 bg-emerald-50' : change < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-500 bg-slate-100';
+  const isPositive = change > 0;
+  const isNegative = change < 0;
+  const badgeStyle = {
+    display: 'inline-block',
+    padding: '2px 8px',
+    borderRadius: '12px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    backgroundColor: isPositive ? '#ecfdf5' : isNegative ? '#fff1f2' : '#f1f5f9',
+    color: isPositive ? '#059669' : isNegative ? '#e11d48' : '#64748b',
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <div className="mt-2 flex items-baseline gap-1.5">
-        <span className="text-2xl font-bold text-slate-800">{formatNumber(value)}</span>
-        {value !== null && <span className="text-xs text-slate-500">{unit}</span>}
+    <div style={{
+      background: '#fff',
+      borderRadius: '16px',
+      border: '1px solid #e2e8f0',
+      padding: '20px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    }}>
+      <div>
+        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>{label}</p>
+        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+          <span style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#1e293b' }}>
+            {formatNumber(value)}
+          </span>
+          {value !== null && <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{unit}</span>}
+        </div>
       </div>
-      <div className="mt-3 flex items-center justify-between text-xs">
-        <span className={`px-2 py-0.5 rounded-full font-semibold ${tone}`}>{formatChange(change)}</span>
-        <span className="text-slate-400">{previousLabel}: {formatNumber(previous)}</span>
+      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={badgeStyle}>{formatChange(change)}</span>
+        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{previousLabel}: {formatNumber(previous)}</span>
       </div>
     </div>
   );
@@ -43,40 +83,79 @@ function MetricCard({ label, unit, value, previous, change, previousLabel }) {
 
 function SuggestionCard({ suggestion }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full">ทางเลือกที่ {suggestion.rank}</span>
-        <span className="text-[11px] text-slate-400 font-mono">{suggestion.template_code}</span>
+    <div style={{
+      background: '#fff',
+      borderRadius: '16px',
+      border: '1px solid #e2e8f0',
+      padding: '20px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{
+          fontSize: '0.75rem',
+          fontWeight: 'bold',
+          color: '#2e7d32',
+          background: '#e8f5e9',
+          padding: '2px 10px',
+          borderRadius: '12px',
+        }}>
+          ทางเลือกที่ {suggestion.rank}
+        </span>
+        <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+          {suggestion.template_code}
+        </span>
       </div>
-      <h4 className="font-bold text-slate-800 leading-tight">{suggestion.template_name}</h4>
-      <div className="flex flex-wrap gap-1.5">
+      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 'bold', color: '#1e293b' }}>
+        {suggestion.template_name}
+      </h4>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         {describeParameters(suggestion.parameters).map((text) => (
-          <span key={text} className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-lg">{text}</span>
+          <span key={text} style={{
+            fontSize: '0.75rem',
+            background: '#f1f5f9',
+            color: '#334155',
+            padding: '4px 8px',
+            borderRadius: '6px',
+          }}>
+            {text}
+          </span>
         ))}
       </div>
-      <p className="text-sm text-slate-600 leading-relaxed flex-1">{suggestion.reason}</p>
-      <div className="flex items-center gap-1.5 text-xs text-slate-500 pt-3 border-t border-slate-100">
-        <Target className="w-3.5 h-3.5" />
-        KPI เป้าหมาย: <strong className="text-slate-700">{describeKpi(suggestion.target_kpi)}</strong>
+      <p style={{ margin: 0, fontSize: '0.875rem', color: '#475569', lineHeight: 1.6, flex: 1 }}>
+        {suggestion.reason}
+      </p>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        fontSize: '0.75rem',
+        color: '#64748b',
+        paddingTop: '12px',
+        borderTop: '1px solid #f1f5f9',
+      }}>
+        <Target style={{ width: 14, height: 14 }} />
+        <span>KPI เป้าหมาย: <strong style={{ color: '#1e293b' }}>{describeKpi(suggestion.target_kpi)}</strong></span>
       </div>
     </div>
   );
 }
 
-// ผลตรวจตัวเลขที่ AI อ้างกับข้อมูลที่ส่งให้ AI (SRS 3.4.2) คำนวณโดย backend
 function NumberCheck({ check }) {
   if (!check || check.checked === 0) return null;
   if (check.unverified.length === 0) {
     return (
-      <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-        <BadgeCheck className="w-4 h-4" />
+      <p style={{ margin: '16px 0 0', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#15803d', fontWeight: '500' }}>
+        <BadgeCheck style={{ width: 16, height: 16 }} />
         ตัวเลขที่ AI อ้างถึง {check.checked} ค่า ตรงกับข้อมูลของร้านทั้งหมด
       </p>
     );
   }
   return (
-    <p className="mt-4 flex items-start gap-1.5 text-xs font-medium text-amber-800">
-      <TriangleAlert className="w-4 h-4 shrink-0" />
+    <p style={{ margin: '16px 0 0', display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.8rem', color: '#92400e', fontWeight: '500' }}>
+      <TriangleAlert style={{ width: 16, height: 16, flexShrink: 0 }} />
       ตัวเลขที่ตรวจสอบกับข้อมูลของร้านไม่ได้: {check.unverified.join(', ')} โปรดตรวจสอบก่อนตัดสินใจ
     </p>
   );
@@ -84,36 +163,45 @@ function NumberCheck({ check }) {
 
 function ReportView({ report }) {
   return (
-    <div className="space-y-5">
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-        <p className="text-xs font-semibold text-amber-700 mb-1">ปัญหาที่พบ</p>
-        <p className="font-semibold text-slate-800">{report.problem}</p>
-        <p className="text-sm text-slate-600 mt-2">{report.summary}</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{
+        background: '#fffbeb',
+        border: '1px solid #fef3c7',
+        borderRadius: '16px',
+        padding: '20px',
+      }}>
+        <p style={{ margin: '0 0 6px', fontSize: '0.8rem', fontWeight: 'bold', color: '#b45309' }}>ปัญหาที่พบ</p>
+        <p style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 'bold', color: '#1e293b' }}>{report.problem}</p>
+        <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569', lineHeight: 1.6 }}>{report.summary}</p>
         {report.possible_causes.length > 0 && (
-          <>
-            <p className="text-xs font-semibold text-slate-500 mt-4 mb-1">สาเหตุที่เป็นไปได้</p>
-            <ul className="list-disc list-inside text-sm text-slate-600 space-y-0.5">
-              {report.possible_causes.map((cause) => <li key={cause}>{cause}</li>)}
+          <div style={{ marginTop: '16px' }}>
+            <p style={{ margin: '0 0 6px', fontSize: '0.8rem', fontWeight: '600', color: '#64748b' }}>สาเหตุที่เป็นไปได้</p>
+            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.875rem', color: '#475569' }}>
+              {report.possible_causes.map((cause) => <li key={cause} style={{ marginBottom: '4px' }}>{cause}</li>)}
             </ul>
-          </>
+          </div>
         )}
         <NumberCheck check={report.number_check} />
       </div>
 
       <div>
-        <p className="text-sm font-semibold text-slate-700 mb-3">ข้อเสนอโปรโมชัน 3 ทางเลือก</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {report.suggestions.map((suggestion) => <SuggestionCard key={suggestion.suggestion_id} suggestion={suggestion} />)}
+        <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 'bold', color: '#1e293b' }}>
+          ข้อเสนอโปรโมชัน 3 ทางเลือก
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+          {report.suggestions.map((suggestion) => (
+            <SuggestionCard key={suggestion.suggestion_id} suggestion={suggestion} />
+          ))}
         </div>
       </div>
 
-      <div className="text-xs text-slate-500 space-y-1">
-        <p>วิเคราะห์เมื่อ {formatDateTime(report.created_at)} • โมเดล {report.model_version}</p>
-        <p className="flex items-center gap-1.5">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+      <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <p style={{ margin: 0 }}>วิเคราะห์เมื่อ {formatDateTime(report.created_at)} โดยโมเดล {report.model_version}</p>
+        <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <ShieldCheck style={{ width: 14, height: 14, color: '#16a34a' }} />
           ข้อมูลที่ส่งให้ AI เป็นตัวเลขสรุประดับร้านเท่านั้น ไม่มีข้อมูลส่วนบุคคลของลูกค้า
         </p>
-        <p>AI เป็นผู้เสนอทางเลือกเท่านั้น เจ้าของร้านเป็นผู้ตัดสินใจ และระบบจะไม่สร้างแคมเปญให้อัตโนมัติ</p>
+        <p style={{ margin: 0 }}>AI เป็นผู้เสนอทางเลือกเท่านั้น เจ้าของร้านเป็นผู้ตัดสินใจ และระบบจะไม่สร้างแคมเปญให้อัตโนมัติ</p>
       </div>
     </div>
   );
@@ -122,23 +210,16 @@ function ReportView({ report }) {
 export default function ShopDashboardPage() {
   const { shopId } = useParams();
   const navigate = useNavigate();
-  const [user] = useState(() => JSON.parse(localStorage.getItem('user') || 'null'));
   const [today] = useState(() => bangkokToday());
 
   const [periodType, setPeriodType] = useState('week');
-  const [anchorDate, setAnchorDate] = useState(null); // null = ช่วงล่าสุดที่จบไปแล้ว (ค่าเริ่มต้นของ backend)
+  const [anchorDate, setAnchorDate] = useState(null);
   const requestKey = `${periodType}|${anchorDate ?? 'latest'}`;
 
   const [shopState, setShopState] = useState({ shop: null, error: null });
   const [dashboardState, setDashboardState] = useState({ key: null, data: null, error: null });
   const [savedReport, setSavedReport] = useState({ key: null, report: null, error: null });
   const [generation, setGeneration] = useState({ key: null, running: false, error: null });
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -161,7 +242,6 @@ export default function ShopDashboardPage() {
   const period = dashboard?.period;
   const periodKey = period ? `${period.type}|${period.start}` : null;
 
-  // รายงานที่บันทึกไว้ของช่วงนี้ แสดงได้ทันทีโดยไม่ต้องรอ AI (แผนสำรองตอน demo)
   useEffect(() => {
     if (!periodKey) return undefined;
     let cancelled = false;
@@ -198,14 +278,13 @@ export default function ShopDashboardPage() {
   const authError = [shopState.error, dashboardState.error].find((err) => err?.response?.status === 401);
   useEffect(() => {
     if (authError) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      localStorage.removeItem('thaiplease_token');
+      localStorage.removeItem('thaiplease_user');
       navigate('/login');
     }
   }, [authError, navigate]);
 
   const forbidden = [shopState.error, dashboardState.error].some((err) => err?.response?.status === 403);
-  const dashboardLoading = dashboardState.key !== requestKey;
   const isOngoingPeriod = period ? period.end >= today : false;
   const previousLabel = period?.type === 'MONTH' ? 'เดือนก่อน' : 'สัปดาห์ก่อน';
   const report = savedReport.key === periodKey ? savedReport.report : null;
@@ -214,155 +293,176 @@ export default function ShopDashboardPage() {
   const aiError = generation.key === periodKey ? generation.error : null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link to="/dashboard" className="p-2 -ml-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="กลับไปร้านค้าของฉัน">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
-              <Store className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="font-bold text-slate-800 leading-tight truncate">{shopState.shop?.name || 'ภาพรวมร้านค้า'}</h1>
-              <p className="text-xs text-slate-500">ภาพรวมยอดขายและ AI Shop Advisor</p>
-            </div>
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 32 }}>
+      {/* ส่วนหัวแสดงชื่อร้านและปุ่มย้อนกลับ */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Link to="/merchant/shops" style={{ color: '#64748b', display: 'flex', alignItems: 'center', textDecoration: 'none' }} title="กลับไปร้านค้าของฉัน">
+            <ArrowLeft style={{ width: 20, height: 20 }} />
+          </Link>
+          <div style={{ background: '#2e7d32', color: '#fff', borderRadius: 12, padding: 8, display: 'flex' }}>
+            <Store style={{ width: 22, height: 22 }} />
           </div>
-          <div className="flex items-center gap-4">
-            <p className="text-sm font-semibold text-slate-700 hidden sm:block">{user?.display_name}</p>
-            <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="ออกจากระบบ">
-              <LogOut className="w-5 h-5" />
-            </button>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 'bold', color: '#1e293b' }}>
+              {shopState.shop?.name || 'ภาพรวมร้านค้า'}
+            </h1>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>ภาพรวมยอดขายและ AI Shop Advisor</p>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {forbidden ? (
-          <div className="bg-white border border-rose-200 rounded-2xl p-8 text-center text-rose-700">คุณไม่มีสิทธิ์ดูข้อมูลของร้านนี้</div>
-        ) : (
-          <>
-            <section>
-              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5">
+      {forbidden ? (
+        <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#e11d48', padding: 24, borderRadius: 16, textAlign: 'center' }}>
+          คุณไม่มีสิทธิ์ดูข้อมูลของร้านนี้
+        </div>
+      ) : (
+        <>
+          {/* ส่วนสถิติตัวเลขและตัวเลือกช่วงเวลา */}
+          <section>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+              <div>
+                <h2 style={{ margin: '0 0 4px', fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>ภาพรวมยอดขาย</h2>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                  {period ? <>เทียบกับ{previousLabel} ({formatPeriod(dashboard.comparison.period)})</> : 'กำลังโหลดช่วงเวลา...'}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#f1f5f9', padding: 4, borderRadius: 10, display: 'flex', gap: 4 }}>
+                  {PERIOD_TABS.map((tab) => (
+                    <button
+                      key={tab.value}
+                      onClick={() => { setPeriodType(tab.value); setAnchorDate(null); }}
+                      style={{
+                        border: 'none',
+                        background: periodType === tab.value ? '#fff' : 'transparent',
+                        color: periodType === tab.value ? '#2e7d32' : '#64748b',
+                        fontWeight: '600',
+                        fontSize: '0.85rem',
+                        padding: '6px 14px',
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        boxShadow: periodType === tab.value ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', padding: '2px 4px' }}>
+                  <button
+                    onClick={() => setAnchorDate(shiftDate(period.start, -1))}
+                    disabled={!period}
+                    style={{ border: 'none', background: 'transparent', padding: 6, cursor: 'pointer', color: '#64748b' }}
+                  >
+                    <ChevronLeft style={{ width: 16, height: 16 }} />
+                  </button>
+                  <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#334155', minWidth: 140, textAlign: 'center' }}>
+                    {period ? formatPeriod(period) : '...'}
+                  </span>
+                  <button
+                    onClick={() => setAnchorDate(shiftDate(period.end, 1))}
+                    disabled={!period || isOngoingPeriod}
+                    style={{ border: 'none', background: 'transparent', padding: 6, cursor: 'pointer', color: '#64748b' }}
+                  >
+                    <ChevronRight style={{ width: 16, height: 16 }} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {!dashboard ? (
+              <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8' }}>กำลังคำนวณตัวชี้วัด...</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+                {METRIC_CARDS.map((card) => (
+                  <MetricCard
+                    key={card.key}
+                    label={card.label}
+                    unit={card.unit}
+                    value={dashboard.metrics[card.key]}
+                    previous={dashboard.comparison.metrics[card.key]}
+                    change={dashboard.change_percent[card.key]}
+                    previousLabel={previousLabel}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ส่วน AI Shop Advisor */}
+          <section style={{
+            background: '#fafbf9',
+            border: '1px solid #e2e8f0',
+            borderRadius: 20,
+            padding: 24,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 20,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ background: '#2e7d32', color: '#fff', padding: 8, borderRadius: 12, display: 'flex' }}>
+                  <Sparkles style={{ width: 20, height: 20 }} />
+                </div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800">ภาพรวมยอดขาย</h2>
-                  <p className="text-sm text-slate-500">
-                    {period ? <>เทียบกับ{previousLabel} ({formatPeriod(dashboard.comparison.period)})</> : 'กำลังโหลดช่วงเวลา...'}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex bg-slate-100 p-1 rounded-xl">
-                    {PERIOD_TABS.map((tab) => (
-                      <button
-                        key={tab.value}
-                        onClick={() => { setPeriodType(tab.value); setAnchorDate(null); }}
-                        className={`px-3 py-1.5 text-sm rounded-lg font-medium transition ${periodType === tab.value ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center bg-white border border-slate-200 rounded-xl shadow-sm">
-                    <button onClick={() => setAnchorDate(shiftDate(period.start, -1))} disabled={!period} className="p-2 text-slate-500 hover:text-indigo-600 disabled:opacity-40" title="ช่วงก่อนหน้า">
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="px-2 text-sm font-semibold text-slate-700 min-w-[9rem] text-center">{period ? formatPeriod(period) : '...'}</span>
-                    <button onClick={() => setAnchorDate(shiftDate(period.end, 1))} disabled={!period || isOngoingPeriod} className="p-2 text-slate-500 hover:text-indigo-600 disabled:opacity-40" title="ช่วงถัดไป">
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 'bold', color: '#1e293b' }}>AI Shop Advisor</h3>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>วิเคราะห์ปัญหาและเสนอโปรโมชัน 3 ทางเลือกจากแม่แบบ 10 แบบ</p>
                 </div>
               </div>
 
-              {dashboardState.error && !forbidden && dashboardState.key === requestKey ? (
-                <div className="bg-white border border-rose-200 rounded-2xl p-6 text-rose-700 text-sm">
-                  โหลดตัวชี้วัดไม่สำเร็จ: {dashboardState.error.response?.data?.message || dashboardState.error.message}
-                </div>
-              ) : !dashboard ? (
-                <div className="p-12 text-center text-slate-400">กำลังคำนวณตัวชี้วัด...</div>
-              ) : (
-                <div className={`transition-opacity ${dashboardLoading ? 'opacity-50' : ''}`}>
-                  {isOngoingPeriod && (
-                    <p className="mb-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 inline-block">
-                      ช่วงเวลานี้ยังไม่จบ ตัวเลขจะเปลี่ยนตามรายการชำระเงินใหม่
-                    </p>
-                  )}
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                    {METRIC_CARDS.map((card) => (
-                      <MetricCard
-                        key={card.key}
-                        label={card.label}
-                        unit={card.unit}
-                        value={dashboard.metrics[card.key]}
-                        previous={dashboard.comparison.metrics[card.key]}
-                        change={dashboard.change_percent[card.key]}
-                        previousLabel={previousLabel}
-                      />
-                    ))}
-                  </div>
-                  {dashboard.metrics.orders === 0 && (
-                    <p className="mt-4 text-sm text-slate-500">ยังไม่มีรายการขายที่สำเร็จในช่วงเวลานี้</p>
-                  )}
-                </div>
-              )}
-            </section>
+              <button
+                onClick={generateReport}
+                disabled={!period || generating || isOngoingPeriod}
+                style={{
+                  border: 'none',
+                  background: '#2e7d32',
+                  color: '#fff',
+                  padding: '10px 20px',
+                  borderRadius: 10,
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: (!period || generating || isOngoingPeriod) ? 'not-allowed' : 'pointer',
+                  opacity: (!period || generating || isOngoingPeriod) ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                {generating ? <LoaderCircle style={{ width: 16, height: 16 }} className="animate-spin" /> : report ? <RefreshCw style={{ width: 16, height: 16 }} /> : <Sparkles style={{ width: 16, height: 16 }} />}
+                {generating ? 'กำลังวิเคราะห์...' : report ? 'วิเคราะห์ใหม่' : 'วิเคราะห์ด้วย AI'}
+              </button>
+            </div>
 
-            <section className="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-3xl p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-xl flex items-center justify-center">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800">AI Shop Advisor</h3>
-                    <p className="text-xs text-slate-500">วิเคราะห์ปัญหาและเสนอโปรโมชัน 3 ทางเลือกจากแม่แบบ 10 แบบ</p>
-                  </div>
-                </div>
-                <button
-                  onClick={generateReport}
-                  disabled={!period || generating || isOngoingPeriod}
-                  className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${report ? 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-600/20'}`}
-                >
-                  {generating ? <LoaderCircle className="w-4 h-4 animate-spin" /> : report ? <RefreshCw className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                  {generating ? 'กำลังวิเคราะห์...' : report ? 'วิเคราะห์ใหม่' : 'วิเคราะห์ด้วย AI'}
-                </button>
+            {aiError && (
+              <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#e11d48', padding: '12px 16px', borderRadius: 12, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <TriangleAlert style={{ width: 16, height: 16, flexShrink: 0 }} />
+                <span>{aiError}</span>
               </div>
+            )}
 
-              {isOngoingPeriod && (
-                <p className="text-sm text-slate-500 mb-4">รอให้ช่วงเวลานี้จบก่อนจึงจะวิเคราะห์ได้ เพื่อไม่ให้ AI เทียบตัวเลขที่ยังไม่ครบช่วง</p>
-              )}
-              {aiError && (
-                <div className="mb-4 flex items-start gap-2 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
-                  <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>{aiError}{report && ' — ด้านล่างคือรายงานล่าสุดที่บันทึกไว้'}</span>
+            {generating ? (
+              <div style={{ padding: '36px 0', textAlign: 'center', color: '#64748b' }}>
+                <LoaderCircle style={{ width: 32, height: 32, margin: '0 auto 12px', color: '#2e7d32' }} className="animate-spin" />
+                <p style={{ margin: 0, fontWeight: '600' }}>AI กำลังวิเคราะห์ตัวเลขของร้าน...</p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>ระบบตรวจสอบคำตอบกับตัวเลขจริงในร้านก่อนบันทึกทุกครั้ง</p>
+              </div>
+            ) : reportLoading ? (
+              <div style={{ padding: '24px 0', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>กำลังโหลดรายงานที่บันทึกไว้...</div>
+            ) : report ? (
+              <ReportView report={report} />
+            ) : (
+              !isOngoingPeriod && (
+                <div style={{ padding: '28px 0', textAlign: 'center', color: '#64748b', fontSize: '0.9rem' }}>
+                  ยังไม่มีรายงาน AI สำหรับช่วง {period ? formatPeriod(period) : ''} กด “วิเคราะห์ด้วย AI” เพื่อเริ่ม
                 </div>
-              )}
-              {savedReport.error && savedReport.key === periodKey && (
-                <p className="mb-4 text-sm text-rose-700">{savedReport.error}</p>
-              )}
-
-              {generating ? (
-                <div className="py-12 text-center text-slate-500">
-                  <LoaderCircle className="w-8 h-8 animate-spin mx-auto text-indigo-600 mb-3" />
-                  <p className="font-medium">AI กำลังวิเคราะห์ตัวเลขของร้าน...</p>
-                  <p className="text-xs mt-1">โดยปกติใช้เวลา 10–30 วินาที ระบบจะตรวจคำตอบก่อนบันทึกทุกครั้ง</p>
-                </div>
-              ) : reportLoading ? (
-                <div className="py-8 text-center text-slate-400 text-sm">กำลังโหลดรายงานที่บันทึกไว้...</div>
-              ) : report ? (
-                <ReportView report={report} />
-              ) : (
-                !isOngoingPeriod && (
-                  <div className="py-8 text-center text-slate-500 text-sm">
-                    ยังไม่มีรายงาน AI สำหรับช่วง {period ? formatPeriod(period) : ''} กด “วิเคราะห์ด้วย AI” เพื่อเริ่ม
-                  </div>
-                )
-              )}
-            </section>
-          </>
-        )}
-      </main>
+              )
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

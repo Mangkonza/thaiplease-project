@@ -98,17 +98,26 @@ const getMyShops = async (req, res) => {
   }
 };
 
-// GET /api/v1/shops (ค้นหาและแสดงรายการร้านค้าสถานะ ACTIVE ทั้งหมด - FR-02)
+// GET /api/v1/shops (ค้นหาและแสดงรายการร้านค้าสถานะ ACTIVE ทั้งหมด - FR-02 พร้อมรองรับ Fuzzy Search)
 const getAllShops = async (req, res) => {
   const { search, category, area } = req.query;
 
   try {
     let queryText = 'SELECT * FROM shops WHERE status = $1';
     const queryParams = ['ACTIVE'];
+    let searchParamIdx = null;
 
-    if (search) {
-      queryParams.push(`%${search}%`);
-      queryText += ` AND (name ILIKE $${queryParams.length} OR description ILIKE $${queryParams.length})`;
+    if (search && search.trim()) {
+      queryParams.push(search.trim());
+      searchParamIdx = queryParams.length;
+
+      // ค้นหาทั้งแบบตรงตัว (ILIKE) และแบบคล้ายคลึง (similarity > 0.25)
+      queryText += ` AND (
+        name ILIKE '%' || $${searchParamIdx} || '%'
+        OR description ILIKE '%' || $${searchParamIdx} || '%'
+        OR similarity(name, $${searchParamIdx}) > 0.25
+        OR similarity(COALESCE(description, ''), $${searchParamIdx}) > 0.20
+      )`;
     }
 
     if (category) {
@@ -121,7 +130,15 @@ const getAllShops = async (req, res) => {
       queryText += ` AND area = $${queryParams.length}`;
     }
 
-    queryText += ' ORDER BY created_at DESC';
+    // หากมีการค้นหาคำ ให้เรียงผลลัพธ์จากร้านที่มีคะแนนความตรง/ใกล้เคียงสูงสุดขึ้นก่อน
+    if (searchParamIdx) {
+      queryText += ` ORDER BY GREATEST(
+        similarity(name, $${searchParamIdx}),
+        similarity(COALESCE(description, ''), $${searchParamIdx})
+      ) DESC, created_at DESC`;
+    } else {
+      queryText += ' ORDER BY created_at DESC';
+    }
 
     const result = await db.query(queryText, queryParams);
 

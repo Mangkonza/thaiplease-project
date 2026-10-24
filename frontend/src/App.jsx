@@ -6,6 +6,7 @@ import ShopPage from './pages/ShopPage';
 import CheckoutPage from './pages/CheckoutPage';
 import CoinsPage from './pages/CoinsPage';
 import MerchantShopsPage from './pages/MerchantShopsPage';
+import ShopDashboardPage from './pages/ShopDashboardPage';
 import CampaignsPage from './pages/CampaignsPage';
 import CampaignResultPage from './pages/CampaignResultPage';
 import AdminPage from './pages/AdminPage';
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/checkout/:shopId" element={<ProtectedRoute roles={['CITIZEN']}><CheckoutPage /></ProtectedRoute>} />
           <Route path="/coins" element={<ProtectedRoute roles={['CITIZEN']}><CoinsPage /></ProtectedRoute>} />
           <Route path="/merchant/shops" element={<ProtectedRoute roles={['MERCHANT']}><MerchantShopsPage /></ProtectedRoute>} />
+          <Route path="/merchant/shops/:shopId/dashboard" element={<ProtectedRoute roles={['MERCHANT']}><ShopDashboardPage /></ProtectedRoute>} />
           <Route path="/merchant/shops/:shopId/campaigns" element={<ProtectedRoute roles={['MERCHANT']}><CampaignsPage /></ProtectedRoute>} />
           <Route path="/merchant/shops/:shopId/campaigns/:campaignId" element={<ProtectedRoute roles={['MERCHANT']}><CampaignResultPage /></ProtectedRoute>} />
           <Route path="/admin/shops" element={<ProtectedRoute roles={['ADMIN']}><AdminPage /></ProtectedRoute>} />
