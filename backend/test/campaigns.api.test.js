@@ -17,6 +17,45 @@ before(async () => { api = await startServer(); });
 after(async () => { await api.close(); });
 afterEach(() => mock.restoreAll());
 
+describe('PATCH /campaigns/:campaignId', () => {
+  test('renaming a draft works when treatment_ratio comes back from pg as a string', async () => {
+    let updateParams;
+    mock.method(db, 'query', async (sql) => {
+      if (sql.startsWith('SELECT status FROM users')) return { rows: [{ status: 'ACTIVE' }] };
+      if (sql.includes('FROM campaigns c JOIN shops')) return { rows: [{ shop_id: SHOP_ID, owner_id: OWNER_ID }] };
+      throw new Error(`Unexpected pool query: ${sql}`);
+    });
+    mock.method(db.pool, 'connect', async () => ({
+      query: async (sql, params) => {
+        if (sql.includes('FROM campaigns c') && sql.includes('FOR UPDATE')) {
+          return { rows: [{
+            campaign_id: CAMPAIGN_ID, status: 'DRAFT', name: 'old', treatment_ratio: '0.5000',
+            parameters: { discount_percent: 10, min_spend: 150 },
+            start_at: new Date('2026-11-01T00:00:00Z'), end_at: new Date('2026-11-08T00:00:00Z'),
+            parameter_schema: {
+              type: 'object',
+              properties: { discount_percent: { type: 'number', minimum: 1, maximum: 100 }, min_spend: { type: 'number', minimum: 0 } },
+              required: ['discount_percent', 'min_spend'],
+            },
+          }] };
+        }
+        if (sql.includes('UPDATE campaigns')) {
+          updateParams = params;
+          return { rows: [{ campaign_id: CAMPAIGN_ID, status: 'DRAFT', name: params[1] }] };
+        }
+        return { rows: [] };
+      },
+      release() {},
+    }));
+
+    const response = await api.request('PATCH', `/api/v1/campaigns/${CAMPAIGN_ID}`, { token, body: { name: 'ชื่อใหม่' } });
+
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(updateParams[1], 'ชื่อใหม่');
+    assert.equal(updateParams[5], 0.5);
+  });
+});
+
 describe('POST /campaigns/:campaignId/end', () => {
   test('ending early moves end_at to now so the campaign can be evaluated right away (D-06)', async () => {
     let updateSql;
