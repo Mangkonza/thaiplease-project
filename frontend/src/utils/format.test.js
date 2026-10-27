@@ -3,7 +3,34 @@ import assert from 'node:assert/strict';
 import {
   formatNumber, formatChange, formatPeriod, formatDateTime, bangkokToday, shiftDate,
   describeParameters, describeKpi, aiErrorMessage,
+  campaignKpiKind, formatCampaignMetric, formatUplift,
 } from './format.js';
+
+describe('campaign result units follow the promotion template (D-04)', () => {
+  test('KPI kind comes from the template code, not from free-text target_kpi', () => {
+    assert.equal(campaignKpiKind('PERCENT_DISCOUNT'), 'rate');
+    assert.equal(campaignKpiKind('BONUS_COIN'), 'frequency');
+    assert.equal(campaignKpiKind('MIN_SPEND_REWARD'), 'aov');
+  });
+
+  test('rate uplift is already in percentage points and is not multiplied again', () => {
+    // ค่าจริงจากการทดสอบ: treatment 0.6667, control 0.7143 -> uplift -4.7619 จุด %
+    assert.equal(formatUplift(-4.7619, 'PERCENT_DISCOUNT'), '-4.76 จุด %');
+    assert.equal(formatUplift(12.5, 'NEW_CUSTOMER'), '+12.5 จุด %');
+  });
+
+  test('group metrics show rates as percent and other KPIs with their units', () => {
+    assert.equal(formatCampaignMetric(0.6667, 'PERCENT_DISCOUNT'), '66.67%');
+    assert.equal(formatCampaignMetric(1.25, 'FREQUENCY_REWARD'), '1.25 ครั้ง/คน');
+    assert.equal(formatCampaignMetric(160.4166, 'MIN_SPEND_REWARD'), '160.42 บาท');
+    assert.equal(formatUplift(50, 'MIN_SPEND_REWARD'), '+50 บาท');
+  });
+
+  test('missing values say they could not be calculated', () => {
+    assert.equal(formatCampaignMetric(null, 'PERCENT_DISCOUNT'), 'คำนวณไม่ได้');
+    assert.equal(formatUplift(null, 'PERCENT_DISCOUNT'), 'คำนวณไม่ได้');
+  });
+});
 
 describe('numbers', () => {
   test('formats with thousands separator and up to 2 decimals', () => {

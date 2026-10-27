@@ -78,6 +78,33 @@ export function describeKpi(kpi) {
   return KPI_TEXT[kpi] || kpi;
 }
 
+// KPI ของแคมเปญขึ้นกับประเภทโปร (D-04) ต้องตรงกับ backend/src/modules/campaigns/campaign.metrics.js
+const RATE_TEMPLATES = ['PERCENT_DISCOUNT', 'FIXED_DISCOUNT', 'TIME_BASED', 'DAY_BASED', 'NEW_CUSTOMER', 'COMEBACK_REWARD'];
+const FREQUENCY_TEMPLATES = ['COIN_MULTIPLIER', 'BONUS_COIN', 'FREQUENCY_REWARD'];
+
+export function campaignKpiKind(templateCode) {
+  if (RATE_TEMPLATES.includes(templateCode)) return 'rate';
+  if (FREQUENCY_TEMPLATES.includes(templateCode)) return 'frequency';
+  return 'aov';
+}
+
+// ค่า KPI ของแต่ละกลุ่ม: อัตรา (0-1) แสดงเป็น %
+export function formatCampaignMetric(value, templateCode) {
+  if (value === null || value === undefined) return 'คำนวณไม่ได้';
+  const kind = campaignKpiKind(templateCode);
+  if (kind === 'rate') return `${formatNumber(Number(value) * 100)}%`;
+  return `${formatNumber(Number(value))} ${kind === 'aov' ? 'บาท' : 'ครั้ง/คน'}`;
+}
+
+// uplift ของ KPI แบบอัตรา backend คูณ 100 มาแล้ว (เป็นจุด %) จึงห้ามคูณซ้ำ
+export function formatUplift(value, templateCode) {
+  if (value === null || value === undefined) return 'คำนวณไม่ได้';
+  const kind = campaignKpiKind(templateCode);
+  const unit = kind === 'rate' ? 'จุด %' : kind === 'aov' ? 'บาท' : 'ครั้ง/คน';
+  const sign = Number(value) > 0 ? '+' : '';
+  return `${sign}${formatNumber(Number(value))} ${unit}`;
+}
+
 // ข้อความตาม SRS 3.6.4 แยกตาม reason ที่ backend ส่งมา
 export function aiErrorMessage(responseBody) {
   switch (responseBody?.reason) {
