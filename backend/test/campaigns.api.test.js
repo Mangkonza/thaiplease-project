@@ -17,6 +17,32 @@ before(async () => { api = await startServer(); });
 after(async () => { await api.close(); });
 afterEach(() => mock.restoreAll());
 
+describe('POST /campaigns/:campaignId/end', () => {
+  test('ending early moves end_at to now so the campaign can be evaluated right away (D-06)', async () => {
+    let updateSql;
+    mock.method(db, 'query', async (sql) => {
+      if (sql.startsWith('SELECT status FROM users')) return { rows: [{ status: 'ACTIVE' }] };
+      if (sql.includes('FROM campaigns c JOIN shops')) return { rows: [{ shop_id: SHOP_ID, owner_id: OWNER_ID }] };
+      throw new Error(`Unexpected pool query: ${sql}`);
+    });
+    mock.method(db.pool, 'connect', async () => ({
+      query: async (sql) => {
+        if (sql.includes("SET status = 'ENDED'")) {
+          updateSql = sql;
+          return { rows: [{ campaign_id: CAMPAIGN_ID, status: 'ENDED' }] };
+        }
+        return { rows: [] };
+      },
+      release() {},
+    }));
+
+    const response = await api.request('POST', `/api/v1/campaigns/${CAMPAIGN_ID}/end`, { token });
+
+    assert.equal(response.status, 200);
+    assert.match(updateSql, /end_at = GREATEST\(start_at, LEAST\(end_at, NOW\(\)\)\)/);
+  });
+});
+
 describe('POST /campaigns/:campaignId/activate', () => {
   test('assigns each active citizen deterministically and activates in one transaction', async () => {
     const assignments = [];

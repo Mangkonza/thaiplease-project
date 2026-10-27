@@ -295,8 +295,10 @@ async function endCampaign(req, res) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+    // ปิดก่อนกำหนด = เลื่อน end_at มาเป็นตอนนี้ (D-06) ไม่อย่างนั้น evaluate จะรอจนถึง end_at เดิม
     const updated = await client.query(
-      `UPDATE campaigns SET status = 'ENDED', updated_at = NOW()
+      `UPDATE campaigns
+       SET status = 'ENDED', end_at = GREATEST(start_at, LEAST(end_at, NOW())), updated_at = NOW()
        WHERE campaign_id = $1 AND status = 'ACTIVE' RETURNING *`,
       [req.params.campaignId]
     );
