@@ -1,5 +1,7 @@
 -- 1. เปิด Extension สำหรับ UUID
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- ใช้กับการค้นหาร้านแบบพิมพ์ผิดได้ (similarity) ต้องมีตั้งแต่สร้าง DB ไม่ใช่รอ backend สร้างตอนเริ่มทำงาน
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- 2. สร้าง Custom ENUMs ทั้งหมดตามที่ระบุใน SRS
 CREATE TYPE user_role AS ENUM ('CITIZEN', 'MERCHANT', 'ADMIN');
