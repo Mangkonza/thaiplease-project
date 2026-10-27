@@ -11,6 +11,7 @@ const paymentRoutes = require('./modules/payments/payment.routes');
 const coinRoutes = require('./modules/coins/coin.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 const campaignRoutes = require('./modules/campaigns/campaign.routes');
+const policyRoutes = require('./modules/policies/policy.routes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/v1', aiReportRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/users/me', coinRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/policy', policyRoutes);
 app.use('/api/v1', campaignRoutes);
 
 // Error Handling กรณีหา Endpoint ไม่เจอ (404)

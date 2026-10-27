@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatNumber, formatChange, formatPeriod, formatDateTime, bangkokToday, shiftDate,
   describeParameters, describeKpi, aiErrorMessage,
-  campaignKpiKind, formatCampaignMetric, formatUplift,
+  campaignKpiKind, formatCampaignMetric, formatUplift, formatBaht, subsidyStatusText,
 } from './format.js';
 
 describe('campaign result units follow the promotion template (D-04)', () => {
@@ -95,5 +95,19 @@ describe('AI report text', () => {
     assert.match(aiErrorMessage({ reason: 'AI_INVALID_OUTPUT' }), /ไม่บันทึกผล/);
     assert.equal(aiErrorMessage({ message: 'boom' }), 'สร้างรายงานไม่สำเร็จ: boom');
     assert.equal(aiErrorMessage(undefined), 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ โปรดลองอีกครั้ง');
+  });
+});
+
+describe('co-pay display', () => {
+  test('formatBaht always shows two decimals', () => {
+    assert.match(formatBaht(60), /^60\.00 บาท$/);
+    assert.match(formatBaht('1234.5'), /^1,234\.50 บาท$/);
+    assert.equal(formatBaht(null), '—');
+  });
+
+  test('subsidyStatusText explains why the subsidy is short', () => {
+    assert.equal(subsidyStatusText('APPLIED'), null);
+    assert.match(subsidyStatusText('CAP_REACHED'), /เพดาน/);
+    assert.match(subsidyStatusText('OUTSIDE_PROGRAM'), /นอกช่วงเวลาโครงการ/);
   });
 });

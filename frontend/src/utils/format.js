@@ -121,3 +121,19 @@ export function aiErrorMessage(responseBody) {
         : 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ โปรดลองอีกครั้ง';
   }
 }
+
+export function formatBaht(value) {
+  if (value === null || value === undefined) return '—';
+  return `${Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
+}
+
+// สถานะรัฐช่วยจ่ายจาก backend (payments/checkout.calculator.js)
+export function subsidyStatusText(status) {
+  switch (status) {
+    case 'APPLIED': return null;
+    case 'CAP_REACHED': return 'รัฐช่วยจ่ายได้ไม่เต็มสัดส่วน เพราะใช้สิทธิ์ถึงเพดานแล้ว';
+    case 'OUTSIDE_PROGRAM': return 'อยู่นอกช่วงเวลาโครงการ จึงไม่มีรัฐช่วยจ่าย';
+    case 'NO_POLICY': return 'ยังไม่มีการตั้งนโยบายโครงการ จึงไม่มีรัฐช่วยจ่าย';
+    default: return null;
+  }
+}
