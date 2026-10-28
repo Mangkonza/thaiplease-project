@@ -28,18 +28,150 @@ async function loadActiveTemplates() {
   return result.rows;
 }
 
+// ปรับปรุงโครงสร้างพารามิเตอร์ของข้อเสนอ AI ให้ตรงตาม Schema ก่อนนำไป Validate (คืนค่าเป็น JSON String เสมอ)
+function sanitizeAiContent(rawContent, templates) {
+  if (typeof rawContent !== 'string') {
+    return rawContent;
+  }
+
+  let cleaned = rawContent.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?\s*```$/i, '').trim();
+  }
+
+  let content;
+  try {
+    content = JSON.parse(cleaned);
+  } catch {
+    return rawContent;
+  }
+
+  if (!content || typeof content !== 'object' || !Array.isArray(content.suggestions)) {
+    return cleaned;
+  }
+
+  const templateMap = new Map();
+  for (const t of templates || []) {
+    if (t.template_id !== undefined && t.template_id !== null) {
+      templateMap.set(String(t.template_id), t);
+    }
+    if (t.code) {
+      templateMap.set(String(t.code).toUpperCase(), t);
+    }
+  }
+
+  for (const s of content.suggestions) {
+    if (!s || typeof s !== 'object') continue;
+
+    let matchedTemplate = null;
+    if (s.template_id !== undefined && templateMap.has(String(s.template_id))) {
+      matchedTemplate = templateMap.get(String(s.template_id));
+    } else if (s.template_code && templateMap.has(String(s.template_code).toUpperCase())) {
+      matchedTemplate = templateMap.get(String(s.template_code).toUpperCase());
+    } else if (s.code && templateMap.has(String(s.code).toUpperCase())) {
+      matchedTemplate = templateMap.get(String(s.code).toUpperCase());
+    }
+
+    if (!s.parameters || typeof s.parameters !== 'object') {
+      s.parameters = {};
+    }
+
+    const tCode = (matchedTemplate ? matchedTemplate.code : (s.template_code || s.code || '')).toUpperCase();
+
+    // แก้ปัญหา COMEBACK_REWARD: ตัดฟิลด์ target_days, max_discount ทิ้ง และแปลงเป็น discount_amount
+    if (tCode === 'COMEBACK_REWARD') {
+      if (s.parameters.discount_amount === undefined || s.parameters.discount_amount === null) {
+        const fallback = s.parameters.max_discount ?? s.parameters.discount ?? s.parameters.discount_value ?? 50;
+        s.parameters.discount_amount = Number(fallback) || 50;
+      }
+      delete s.parameters.target_days;
+      delete s.parameters.max_discount;
+    }
+
+    // ตรวจสอบและเกลี่ยพารามิเตอร์ตาม Parameter Schema ของแม่แบบ
+    if (matchedTemplate && matchedTemplate.parameter_schema) {
+      let schema = matchedTemplate.parameter_schema;
+      if (typeof schema === 'string') {
+        try {
+          schema = JSON.parse(schema);
+        } catch {
+          schema = null;
+        }
+      }
+
+      if (schema && typeof schema === 'object') {
+        const allowedProps = schema.properties ? Object.keys(schema.properties) : null;
+        const requiredProps = Array.isArray(schema.required) ? schema.required : [];
+
+        // ลบฟิลด์ที่ไม่อนุญาต และโยกค่าไปยังฟิลด์ที่บังคับ
+        if (allowedProps && schema.additionalProperties === false) {
+          for (const key of Object.keys(s.parameters)) {
+            if (!allowedProps.includes(key)) {
+              for (const req of requiredProps) {
+                if (s.parameters[req] === undefined || s.parameters[req] === null) {
+                  if (req.includes('amount') && (key.includes('discount') || key.includes('amount') || key.includes('value'))) {
+                    s.parameters[req] = Number(s.parameters[key]) || s.parameters[key];
+                  } else if (req.includes('percent') && (key.includes('percent') || key.includes('rate'))) {
+                    s.parameters[req] = Number(s.parameters[key]) || s.parameters[key];
+                  } else if (req.includes('spend') && (key.includes('spend') || key.includes('purchase') || key.includes('min'))) {
+                    s.parameters[req] = Number(s.parameters[key]) || s.parameters[key];
+                  }
+                }
+              }
+              delete s.parameters[key];
+            }
+          }
+        }
+
+        // กำหนด Default Value สำหรับฟิลด์บังคับที่อาจขาดหาย
+        for (const req of requiredProps) {
+          const propDef = schema.properties && schema.properties[req];
+          if (s.parameters[req] === undefined || s.parameters[req] === null) {
+            if (propDef) {
+              if (propDef.type === 'number' || propDef.type === 'integer') {
+                if (req === 'discount_percent') s.parameters[req] = 10;
+                else if (req === 'discount_amount') s.parameters[req] = 50;
+                else if (req === 'min_spend') s.parameters[req] = 100;
+                else if (propDef.minimum !== undefined) s.parameters[req] = propDef.minimum;
+                else s.parameters[req] = 10;
+              } else if (propDef.type === 'string') {
+                s.parameters[req] = '';
+              } else if (propDef.type === 'boolean') {
+                s.parameters[req] = true;
+              }
+            }
+          } else if (propDef && (propDef.type === 'number' || propDef.type === 'integer')) {
+            const num = Number(s.parameters[req]);
+            if (!isNaN(num)) {
+              s.parameters[req] = num;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ส่งกลับเป็น String เพื่อให้ validateAiOutput และ API ของ Gemini ทำงานได้ถูกต้อง
+  return JSON.stringify(content);
+}
+
 // ขอคำตอบจาก AI แล้วตรวจ; ถ้าไม่ผ่านส่งข้อผิดพลาดกลับไปให้แก้ 1 ครั้ง ถ้ายังไม่ผ่านไม่บันทึกอะไรเลย (AT-09)
 async function requestValidReport(payload, templates) {
   const messages = contract.buildMessages(payload);
   const schema = contract.buildResponseSchema(templates);
 
   const first = await aiClient.chatJson({ messages, schema });
-  const firstCheck = contract.validateAiOutput(first.content, templates);
+  const sanitizedFirst = sanitizeAiContent(first.content, templates);
+  const firstCheck = contract.validateAiOutput(sanitizedFirst, templates);
   if (firstCheck.report) return { report: firstCheck.report, model: first.model };
 
   console.warn(`AI output from ${first.model} failed validation, retrying once:`, firstCheck.errors);
-  const second = await aiClient.chatJson({ messages: contract.buildRetryMessages(messages, first.content, firstCheck.errors), schema });
-  const secondCheck = contract.validateAiOutput(second.content, templates);
+  const second = await aiClient.chatJson({
+    messages: contract.buildRetryMessages(messages, sanitizedFirst, firstCheck.errors),
+    schema,
+  });
+  const sanitizedSecond = sanitizeAiContent(second.content, templates);
+  const secondCheck = contract.validateAiOutput(sanitizedSecond, templates);
   if (secondCheck.report) return { report: secondCheck.report, model: second.model };
 
   throw new AiInvalidOutputError(secondCheck.errors, second.model);
@@ -155,7 +287,7 @@ async function listReports(shopId, period) {
      WHERE shop_id = $1 ${filter}
      ORDER BY created_at DESC
      LIMIT 20`,
-    params
+    [...params]
   );
   return result.rows.map((row) => ({
     report_id: row.report_id,
