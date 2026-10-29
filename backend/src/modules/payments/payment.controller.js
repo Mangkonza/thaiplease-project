@@ -4,15 +4,21 @@ const { quoteCampaignBenefit, recordRedemption } = require('../campaigns/campaig
 const { UUID_PATTERN } = require('../../middlewares/shop.middleware');
 const { getActivePolicy, getSubsidyUsage } = require('../policies/policy.service');
 const { calculateCheckout } = require('./checkout.calculator');
+const { lockCouponForCheckout } = require('../coupons/coupon.service');
+const { completeMissions } = require('../missions/mission.service');
 
 const DEFAULT_BAHT_PER_COIN = 25;
 
 const isValidAmount = (amount) => Number.isFinite(amount) && amount > 0 &&
   amount <= 9999999999.99 && Math.abs(Math.round(amount * 100) - amount * 100) <= 1e-8;
 
+// coupon_id ไม่บังคับ ส่งมาเป็น null หรือไม่ส่งเลย = ไม่ใช้คูปอง
+const readCouponId = (value) => (value === undefined || value === null || value === '' ? null : value);
+const isValidCouponId = (couponId) => couponId === null || (typeof couponId === 'string' && UUID_PATTERN.test(couponId));
+
 // ตรวจร้านแล้วคิดราคาตาม D-12 ใช้ร่วมกันระหว่างหน้าแสดงยอดก่อนจ่ายและการจ่ายจริง
 // ต้องเรียกใน transaction; ล็อกแถว users ของผู้จ่ายไว้ให้รายการของคนเดียวกันคิดเพดานต่อกันทีละรายการ
-async function priceCheckout(client, { shopId, userId, grossAmount, paidAt }) {
+async function priceCheckout(client, { shopId, userId, grossAmount, couponId, paidAt }) {
   const shop = await client.query(
     'SELECT shop_id, status FROM shops WHERE shop_id = $1 FOR SHARE',
     [shopId]
@@ -24,27 +30,37 @@ async function priceCheckout(client, { shopId, userId, grossAmount, paidAt }) {
   await client.query('SELECT user_id FROM users WHERE user_id = $1 FOR UPDATE', [userId]);
   const policy = await getActivePolicy(client);
   const usage = policy ? await getSubsidyUsage(client, userId, paidAt) : { today: 0, month: 0, total: 0 };
+  const campaignDiscount = benefit ? benefit.discountAmount : 0;
+  let coupon = null;
+  if (couponId) {
+    const locked = await lockCouponForCheckout(client, { couponId, userId, shopReceives: grossAmount - campaignDiscount, paidAt });
+    if (locked.error) return locked;
+    coupon = locked.coupon;
+  }
   const breakdown = calculateCheckout({
     grossAmount,
-    campaignDiscount: benefit ? benefit.discountAmount : 0,
+    campaignDiscount,
+    couponDiscount: coupon ? coupon.value : 0,
     policy,
     usage,
     paidAt,
   });
-  return { benefit, policy, breakdown };
+  return { benefit, policy, coupon, breakdown };
 }
 
 async function quotePayment(req, res) {
   const { shop_id: shopId, gross_amount: grossAmount } = req.body;
   const amount = Number(grossAmount);
+  const couponId = readCouponId(req.body.coupon_id);
   if (!UUID_PATTERN.test(shopId || '') || !isValidAmount(amount)) {
     return res.status(400).json({ success: false, message: 'shop_id and a positive gross_amount are required' });
   }
+  if (!isValidCouponId(couponId)) return res.status(400).json({ success: false, message: 'coupon_id must be a UUID' });
 
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
-    const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, paidAt: new Date() });
+    const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, couponId, paidAt: new Date() });
     await client.query('ROLLBACK');
     if (priced.error) return res.status(priced.error.status).json({ success: false, message: priced.error.message });
     const bahtPerCoin = priced.policy ? priced.policy.baht_per_coin : DEFAULT_BAHT_PER_COIN;
@@ -68,6 +84,7 @@ async function quotePayment(req, res) {
 async function createPayment(req, res) {
   const { shop_id: shopId, request_key: requestKey, gross_amount: grossAmount } = req.body;
   const amount = Number(grossAmount);
+  const couponId = readCouponId(req.body.coupon_id);
 
   if (!UUID_PATTERN.test(shopId || '') || !requestKey || typeof requestKey !== 'string' || requestKey.length > 100 ||
       !requestKey.trim() || !isValidAmount(amount)) {
@@ -76,6 +93,7 @@ async function createPayment(req, res) {
       message: 'shop_id, request_key, and a positive gross_amount are required',
     });
   }
+  if (!isValidCouponId(couponId)) return res.status(400).json({ success: false, message: 'coupon_id must be a UUID' });
 
   const client = await db.pool.connect();
   try {
@@ -94,12 +112,12 @@ async function createPayment(req, res) {
     }
 
     const paidAt = new Date();
-    const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, paidAt });
+    const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, couponId, paidAt });
     if (priced.error) {
       await client.query('ROLLBACK');
       return res.status(priced.error.status).json({ success: false, message: priced.error.message });
     }
-    const { benefit, policy, breakdown } = priced;
+    const { benefit, policy, coupon, breakdown } = priced;
     const netAmount = breakdown.shop_receives;
     const result = await client.query(
       `INSERT INTO payments (request_key, user_id, shop_id, gross_amount, discount_amount, net_amount,
@@ -110,6 +128,13 @@ async function createPayment(req, res) {
         breakdown.coupon_discount, breakdown.government_subsidy, breakdown.citizen_paid, breakdown.policy_version, paidAt]
     );
     const payment = result.rows[0];
+
+    if (coupon) {
+      await client.query(
+        `UPDATE coupons SET status = 'USED', payment_id = $2, used_at = $3 WHERE coupon_id = $1`,
+        [coupon.coupon_id, payment.payment_id, paidAt]
+      );
+    }
 
     if (benefit) {
       await recordRedemption(client, {
@@ -135,12 +160,15 @@ async function createPayment(req, res) {
         [req.user.user_id, payment.payment_id, benefit.bonusCoins]
       );
     }
+    const missions = await completeMissions(client, { userId: req.user.user_id, paymentId: payment.payment_id, paidAt });
+    const missionCoins = missions.reduce((sum, mission) => sum + mission.reward_coins, 0);
 
     await client.query('COMMIT');
     return res.status(201).json({
       success: true,
       payment,
-      coins_earned: regularCoins + (benefit ? benefit.bonusCoins : 0),
+      coins_earned: regularCoins + (benefit ? benefit.bonusCoins : 0) + missionCoins,
+      missions_completed: missions,
       campaign_benefit: benefit,
       breakdown,
     });

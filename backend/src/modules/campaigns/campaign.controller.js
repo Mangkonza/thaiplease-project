@@ -3,6 +3,7 @@ const db = require('../../config/db');
 const { writeAudit } = require('../shared/audit');
 const { validateCampaignParameters } = require('./campaign.service');
 const { evaluateCampaign } = require('./campaign.metrics');
+const { COIN_TEMPLATES } = require('../budget/budget.service');
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -198,7 +199,8 @@ async function updateCampaign(req, res) {
     const updated = await client.query(
       `UPDATE campaigns
        SET name = $2, parameters = $3, start_at = $4, end_at = $5,
-           treatment_ratio = $6, updated_at = NOW()
+           treatment_ratio = $6, updated_at = NOW(),
+           coin_approval_status = NULL, coin_approval_note = NULL, coin_approved_by = NULL, coin_approved_at = NULL
        WHERE campaign_id = $1 AND status = 'DRAFT'
        RETURNING *`,
       [req.params.campaignId, nextName, JSON.stringify(nextParameters), nextStart, nextEnd, nextRatio]
@@ -247,6 +249,11 @@ async function activateCampaign(req, res) {
     if (current.rows[0].status !== 'DRAFT') {
       await client.query('ROLLBACK');
       return res.status(409).json({ success: false, message: 'Only draft campaigns can be activated' });
+    }
+    const template = await client.query('SELECT code FROM promotion_templates WHERE template_id = $1', [current.rows[0].template_id]);
+    if (COIN_TEMPLATES.includes(template.rows[0]?.code) && current.rows[0].coin_approval_status !== 'APPROVED') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'Coin campaigns need admin approval before activation' });
     }
     const active = await client.query(
       `SELECT campaign_id FROM campaigns
@@ -352,7 +359,10 @@ async function evaluate(req, res) {
       [campaign.shop_id, users, campaign.end_at]
     );
     const redemptions = await client.query(
-      'SELECT COUNT(*)::integer AS count FROM promotion_redemptions WHERE campaign_id = $1',
+      // รายการที่คืนเงินแล้วไม่นับเป็นการใช้สิทธิ์
+      `SELECT COUNT(*)::integer AS count FROM promotion_redemptions r
+       JOIN payments p ON p.payment_id = r.payment_id
+       WHERE r.campaign_id = $1 AND p.status = 'SUCCESS'`,
       [req.params.campaignId]
     );
     const metrics = evaluateCampaign({
@@ -437,7 +447,7 @@ async function getCampaignResult(req, res) {
 async function getShopCampaigns(req, res) {
   try {
     const result = await db.query(
-      `SELECT c.*, t.name AS template_name, r.result_status, r.uplift
+      `SELECT c.*, t.name AS template_name, t.code AS template_code, r.result_status, r.uplift
        FROM campaigns c JOIN promotion_templates t ON t.template_id = c.template_id
        LEFT JOIN campaign_results r ON r.campaign_id = c.campaign_id
        WHERE c.shop_id = $1 ORDER BY c.created_at DESC`,

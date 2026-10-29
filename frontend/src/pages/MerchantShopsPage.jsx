@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api, { getErrorMessage } from '../api';
 
 const PRESET_CATEGORIES = [
@@ -32,6 +32,9 @@ export default function MerchantShopsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
+  // มาจากเมนูในหน้าร้าน (state.stay) = ตั้งใจมาดูรายการร้านหรือเพิ่มร้าน จึงไม่พาเข้าร้านอัตโนมัติ
+  const stay = Boolean(useLocation().state?.stay);
 
   async function loadShops() {
     const { data } = await api.get('/shops/my');
@@ -39,11 +42,18 @@ export default function MerchantShopsPage() {
   }
 
   useEffect(() => {
-    api
-      .get('/shops/my')
-      .then(({ data }) => setShops(data.shops))
+    api.get('/shops/my')
+      .then(({ data }) => {
+        // มีร้านที่เปิดใช้งานร้านเดียว พาเข้าหน้ายอดขายเลย ร้านที่รออนุมัติดูได้จากปุ่ม "ร้านทั้งหมด"
+        const active = data.shops.filter((shop) => shop.status === 'ACTIVE');
+        if (!stay && active.length === 1) {
+          navigate(`/merchant/shops/${active[0].shop_id}/dashboard`, { replace: true });
+          return;
+        }
+        setShops(data.shops);
+      })
       .catch((requestError) => setError(getErrorMessage(requestError)));
-  }, []);
+  }, [stay, navigate]);
 
   async function createShop(event) {
     event.preventDefault();

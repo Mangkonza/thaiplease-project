@@ -31,7 +31,7 @@ async function startServer() {
     return { status: res.status, body: await res.json() };
   };
 
-  return { request, close: () => new Promise((resolve) => server.close(resolve)) };
+  return { request, baseUrl, close: () => new Promise((resolve) => server.close(resolve)) };
 }
 
 function signToken(payload, options = { expiresIn: '1h' }) {

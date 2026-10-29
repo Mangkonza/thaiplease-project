@@ -1,3 +1,4 @@
+const path = require('node:path');
 const express = require('express');
 const cors = require('cors');
 const db = require('./config/db');
@@ -12,6 +13,7 @@ const coinRoutes = require('./modules/coins/coin.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 const campaignRoutes = require('./modules/campaigns/campaign.routes');
 const policyRoutes = require('./modules/policies/policy.routes');
+const caseRoutes = require('./modules/cases/case.routes');
 
 const app = express();
 
@@ -42,7 +44,17 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/users/me', coinRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/policy', policyRoutes);
+app.use('/api/v1', caseRoutes);
 app.use('/api/v1', campaignRoutes);
+
+// ใน Docker frontend กับ backend อยู่ container เดียว: backend เสิร์ฟหน้าเว็บที่ build แล้วด้วย
+// ตอนพัฒนาไม่ได้ตั้งค่านี้ เพราะ frontend รันแยกด้วย Vite
+const frontendDist = process.env.FRONTEND_DIST;
+if (frontendDist) {
+  app.use(express.static(frontendDist));
+  // React Router: path ที่ไม่ใช่ API และไม่ใช่ไฟล์จริง ให้ส่ง index.html แล้วให้ React เลือกหน้าเอง
+  app.get(/^(?!\/api\/|\/health$).*/, (req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
+}
 
 // Error Handling กรณีหา Endpoint ไม่เจอ (404)
 app.use((req, res) => {

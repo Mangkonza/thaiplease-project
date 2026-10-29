@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import api, { getErrorMessage } from '../api';
 import AdminPolicyPanel from '../components/AdminPolicyPanel';
+import AdminCasesPanel from '../components/AdminCasesPanel';
+import AdminMissionsPanel from '../components/AdminMissionsPanel';
+import AdminBudgetPanel from '../components/AdminBudgetPanel';
+import AdminCoinApprovalsPanel from '../components/AdminCoinApprovalsPanel';
 
 export default function AdminPage() {
   const [shops, setShops] = useState([]);
@@ -47,10 +51,14 @@ export default function AdminPage() {
 
   return (
     <div className="content-stack">
-      <div className="section-heading"><div><span className="eyebrow">ADMIN CONSOLE</span><h1>จัดการระบบ</h1><p className="muted">ตรวจสอบคำขอร้านค้าและติดตามกิจกรรมสำคัญ</p></div></div>
-      <div className="tab-bar"><button className={view === 'shops' ? 'tab active' : 'tab'} onClick={() => setView('shops')}>คำขอร้านค้า <span>{shops.length}</span></button><button className={view === 'policy' ? 'tab active' : 'tab'} onClick={() => setView('policy')}>นโยบายโครงการ</button><button className={view === 'logs' ? 'tab active' : 'tab'} onClick={() => setView('logs')}>Audit log</button></div>
+      <div className="section-heading"><div><span className="eyebrow">ADMIN CONSOLE</span><h1>จัดการระบบ</h1><p className="muted">ตรวจสอบคำขอร้านค้า คำร้องของประชาชน และติดตามกิจกรรมสำคัญ</p></div></div>
+      <div className="tab-bar"><button className={view === 'shops' ? 'tab active' : 'tab'} onClick={() => setView('shops')}>คำขอร้านค้า <span>{shops.length}</span></button><button className={view === 'budget' ? 'tab active' : 'tab'} onClick={() => setView('budget')}>งบโครงการ</button><button className={view === 'coin-campaigns' ? 'tab active' : 'tab'} onClick={() => setView('coin-campaigns')}>แคมเปญแจกเหรียญ</button><button className={view === 'cases' ? 'tab active' : 'tab'} onClick={() => setView('cases')}>คำร้อง</button><button className={view === 'missions' ? 'tab active' : 'tab'} onClick={() => setView('missions')}>ภารกิจ</button><button className={view === 'policy' ? 'tab active' : 'tab'} onClick={() => setView('policy')}>นโยบายโครงการ</button><button className={view === 'logs' ? 'tab active' : 'tab'} onClick={() => setView('logs')}>Audit log</button></div>
       {error && <p className="notice notice-error" role="alert">{error}</p>}
       {view === 'policy' && <AdminPolicyPanel />}
+      {view === 'budget' && <AdminBudgetPanel />}
+      {view === 'coin-campaigns' && <AdminCoinApprovalsPanel />}
+      {view === 'cases' && <AdminCasesPanel />}
+      {view === 'missions' && <AdminMissionsPanel />}
       {view === 'shops' && <section className="card"><div className="section-heading compact"><h2>ร้านที่รออนุมัติ</h2><span className="muted">{shops.length} ร้าน</span></div>
         {shops.length ? <div className="list-rows">{shops.map((shop) => <article className="list-row admin-shop" key={shop.shop_id}><div><strong>{shop.name}</strong><small>{shop.owner_name || shop.owner_email} · {shop.category || 'ร้านค้า'} · {shop.area || 'ไม่ระบุพื้นที่'}</small><p>{shop.description}</p><span className="status-badge status-pending">รออนุมัติ</span></div><div className="button-row"><button className="button button-primary button-small" disabled={busy} onClick={() => review(shop, 'ACTIVE')}>อนุมัติ</button><button className="button button-outline button-small" disabled={busy} onClick={() => review(shop, 'SUSPENDED')}>ไม่อนุมัติ</button></div></article>)}</div> : <p className="empty-note">ไม่มีร้านที่รออนุมัติ</p>}
       </section>}
