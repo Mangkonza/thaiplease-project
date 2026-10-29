@@ -142,7 +142,7 @@ describe('refund decisions', () => {
       token: merchantToken, body: { decision: 'APPROVE' },
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body.refund, { payment_id: PAYMENT_ID, coins_reversed: 10, coupons_restored: [COUPON_ID] });
+    assert.deepEqual(response.body.refund, { payment_id: PAYMENT_ID, coins_reversed: 10, coupons_restored: [COUPON_ID], wallet_refunded: 0 });
     const ledger = statements.find((s) => s.sql.includes('INSERT INTO coin_ledger'));
     assert.deepEqual(ledger.params, [CITIZEN_ID, PAYMENT_ID, -10]);
     assert.ok(statements.some((s) => s.sql.includes("status = 'REFUNDED'")));

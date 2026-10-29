@@ -37,6 +37,16 @@ async function refundPayment(client, paymentId) {
   if (!updated.rows.length) return { error: { status: 409, message: 'Only successful payments can be refunded' } };
   const { user_id: userId } = updated.rows[0];
 
+  // คืนเงินเข้ากระเป๋าเท่าที่หักไปจริง รายการก่อนมีกระเป๋าเงินไม่มีแถว PAYMENT จึงไม่คืน
+  const wallet = await client.query(
+    `INSERT INTO wallet_ledger (user_id, payment_id, amount, reason)
+     SELECT user_id, payment_id, -amount, 'REFUND' FROM wallet_ledger
+     WHERE payment_id = $1 AND reason = 'PAYMENT'
+     RETURNING amount`,
+    [paymentId]
+  );
+  const walletRefunded = wallet.rows.length ? Number(wallet.rows[0].amount) : 0;
+
   const coupons = await client.query(
     `UPDATE coupons SET status = 'ACTIVE', payment_id = NULL, used_at = NULL
      WHERE payment_id = $1 RETURNING coupon_id`,
@@ -54,7 +64,9 @@ async function refundPayment(client, paymentId) {
       [userId, paymentId, -coins]
     );
   }
-  return { refund: { payment_id: paymentId, coins_reversed: coins, coupons_restored: coupons.rows.map((row) => row.coupon_id) } };
+  return { refund: {
+    payment_id: paymentId, coins_reversed: coins, coupons_restored: coupons.rows.map((row) => row.coupon_id), wallet_refunded: walletRefunded,
+  } };
 }
 
 module.exports = {

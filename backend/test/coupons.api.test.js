@@ -1,6 +1,6 @@
 const { test, describe, before, after, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
-const { db, startServer, signToken } = require('./helpers');
+const { db, startServer, signToken, TEST_PIN, paymentAccountRows } = require('./helpers');
 
 const CITIZEN_ID = '22222222-2222-4222-8222-222222222222';
 const OTHER_ID = '55555555-5555-4555-8555-555555555555';
@@ -37,6 +37,8 @@ describe('POST /users/me/coupons', () => {
     let lockedUser = false;
     mock.method(db.pool, 'connect', async () => ({
       query: async (sql, params) => {
+        const account = paymentAccountRows(sql);
+        if (account) return account;
         statements.push(sql.trim().split(/\s+/)[0]);
         if (sql.includes('FROM users WHERE user_id = $1 FOR UPDATE')) { lockedUser = true; return { rows: [] }; }
         if (sql.includes('FROM project_policies')) return { rows: [POLICY_ROW] };
@@ -69,6 +71,8 @@ describe('POST /users/me/coupons', () => {
     const statements = [];
     mock.method(db.pool, 'connect', async () => ({
       query: async (sql) => {
+        const account = paymentAccountRows(sql);
+        if (account) return account;
         statements.push(sql.trim().split(/\s+/)[0]);
         if (sql.includes('FROM project_policies')) return { rows: [POLICY_ROW] };
         if (sql.includes('SUM(amount)')) return { rows: [{ balance: 99 }] };
@@ -91,6 +95,8 @@ describe('POST /payments with a coupon', () => {
     activeUserOnly();
     mock.method(db.pool, 'connect', async () => ({
       query: async (sql, params) => {
+        const account = paymentAccountRows(sql);
+        if (account) return account;
         onSql(sql, params);
         if (sql.includes('SELECT * FROM payments WHERE request_key')) return { rows: [] };
         if (sql.includes('SELECT shop_id, status FROM shops')) return { rows: [{ shop_id: SHOP_ID, status: 'ACTIVE' }] };
@@ -116,7 +122,7 @@ describe('POST /payments with a coupon', () => {
     });
 
     const response = await api.request('POST', '/api/v1/payments', {
-      token, body: { shop_id: SHOP_ID, request_key: 'coupon-pay-1', gross_amount: 120, coupon_id: COUPON_ID },
+      token, body: { shop_id: SHOP_ID, pin: TEST_PIN, request_key: 'coupon-pay-1', gross_amount: 120, coupon_id: COUPON_ID },
     });
 
     assert.equal(response.status, 201);
@@ -154,7 +160,7 @@ describe('POST /payments with a coupon', () => {
       mockCheckout({ coupon, onSql: (sql) => statements.push(sql.trim().split(/\s+/)[0]) });
 
       const response = await api.request('POST', '/api/v1/payments', {
-        token, body: { shop_id: SHOP_ID, request_key: `coupon-refuse-${status}-${amount}`, gross_amount: amount, coupon_id: COUPON_ID },
+        token, body: { shop_id: SHOP_ID, pin: TEST_PIN, request_key: `coupon-refuse-${status}-${amount}`, gross_amount: amount, coupon_id: COUPON_ID },
       });
 
       assert.equal(response.status, status);
@@ -168,7 +174,7 @@ describe('POST /payments with a coupon', () => {
     activeUserOnly();
     mock.method(db.pool, 'connect', async () => { throw new Error('must not connect'); });
     const response = await api.request('POST', '/api/v1/payments', {
-      token, body: { shop_id: SHOP_ID, request_key: 'coupon-bad-id', gross_amount: 100, coupon_id: 'abc' },
+      token, body: { shop_id: SHOP_ID, pin: TEST_PIN, request_key: 'coupon-bad-id', gross_amount: 100, coupon_id: 'abc' },
     });
     assert.equal(response.status, 400);
   });

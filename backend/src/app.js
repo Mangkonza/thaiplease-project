@@ -14,6 +14,7 @@ const adminRoutes = require('./modules/admin/admin.routes');
 const campaignRoutes = require('./modules/campaigns/campaign.routes');
 const policyRoutes = require('./modules/policies/policy.routes');
 const caseRoutes = require('./modules/cases/case.routes');
+const { UPLOAD_DIR } = require('./modules/shops/shop-image');
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/v1/users/me', coinRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/policy', policyRoutes);
 app.use('/api/v1', caseRoutes);
+app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', index: false }));
 app.use('/api/v1', campaignRoutes);
 
 // ใน Docker frontend กับ backend อยู่ container เดียว: backend เสิร์ฟหน้าเว็บที่ build แล้วด้วย
@@ -53,7 +55,7 @@ const frontendDist = process.env.FRONTEND_DIST;
 if (frontendDist) {
   app.use(express.static(frontendDist));
   // React Router: path ที่ไม่ใช่ API และไม่ใช่ไฟล์จริง ให้ส่ง index.html แล้วให้ React เลือกหน้าเอง
-  app.get(/^(?!\/api\/|\/health$).*/, (req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
+  app.get(/^(?!\/api\/|\/uploads\/|\/health$).*/, (req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
 }
 
 // Error Handling กรณีหา Endpoint ไม่เจอ (404)

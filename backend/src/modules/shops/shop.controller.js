@@ -9,7 +9,7 @@ const getPublicShopById = async (req, res) => {
   }
   try {
     const result = await db.query(
-      `SELECT shop_id, name, category, area, description, status
+      `SELECT shop_id, name, category, area, description, status, image_path
        FROM shops WHERE shop_id = $1 AND status = 'ACTIVE'`,
       [shopId]
     );

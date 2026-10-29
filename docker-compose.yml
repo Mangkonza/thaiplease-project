@@ -21,6 +21,9 @@ services:
       - ./docker/postgres/06_budget_approvals.sql:/docker-entrypoint-initdb.d/06_budget_approvals.sql
       # ข้อมูล demo ใส่ครั้งแรกที่สร้าง volume เท่านั้น (ดู backend/seed/README.md)
       - ./backend/seed/seed.sql:/docker-entrypoint-initdb.d/07_seed.sql
+      # รันหลัง seed เพื่อเติมยอดเริ่มต้นในกระเป๋าเงินให้ประชาชนใน seed
+      - ./docker/postgres/08_wallet_pin_images.sql:/docker-entrypoint-initdb.d/08_wallet_pin_images.sql
+      - ./docker/postgres/09_monthly_cap_only.sql:/docker-entrypoint-initdb.d/09_monthly_cap_only.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U thaiplease_user -d thaiplease_db"]
       interval: 5s
@@ -63,6 +66,10 @@ services:
       # ใช้ในเครื่องเท่านั้น ถ้าจะเปิดให้คนอื่นใช้ ให้ตั้ง JWT_SECRET ใน shell หรือไฟล์ .env ข้าง docker-compose.yml
       JWT_SECRET: ${JWT_SECRET:-thaiplease-local-docker-only}
       TZ: Asia/Bangkok
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      # รูปที่อัปโหลด เก็บแยกไว้ไม่ให้หายตอน build image ใหม่
+      - uploads_data:/app/uploads
     ports:
       - "8080:5000"
     depends_on:
@@ -72,3 +79,4 @@ services:
 volumes:
   postgres_data:
   pgadmin_data:
+  uploads_data:
