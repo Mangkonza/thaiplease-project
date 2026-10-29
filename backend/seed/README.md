@@ -36,7 +36,10 @@ npm run seed:generate -- --end 2026-10-18
 
 ## ใส่ข้อมูลลงฐานข้อมูล
 
-ต้องรัน `init.sql` และ `02_policy_copay.sql` (สร้างตาราง) ไปแล้ว และตาราง `users`, `shops`, `payments`, `coin_ledger` ต้องยังว่าง
+**วิธีปกติ:** `docker compose up -d` บน volume ใหม่จะรันไฟล์ใน `docker/postgres/` ตามลำดับ (`init.sql`, `02`–`06`) แล้วใส่ `seed.sql` ให้เองเป็นลำดับที่ 7
+ถ้าต้องการล้างแล้วเริ่มใหม่: `docker compose down -v` (ลบข้อมูลทั้งหมดในฐานข้อมูล) แล้ว `docker compose up -d`
+
+**ใส่เองกับ DB ที่มีอยู่:** ต้องรันไฟล์สร้างตารางครบแล้ว และตาราง `users`, `shops`, `payments`, `coin_ledger` ต้องยังว่าง
 ไฟล์อยู่ใน transaction เดียว ถ้าล้มจะไม่มีข้อมูลค้างครึ่งทาง
 
 PowerShell (รันจากโฟลเดอร์ `backend`):
@@ -45,10 +48,12 @@ PowerShell (รันจากโฟลเดอร์ `backend`):
 Get-Content seed\seed.sql -Raw -Encoding utf8 | docker exec -i thaiplease_postgres psql -U thaiplease_user -d thaiplease_db -v ON_ERROR_STOP=1
 ```
 
-ถ้าต้องการล้างแล้วเริ่มใหม่: `docker compose down -v` จะลบข้อมูลทั้งหมดในฐานข้อมูล แล้ว `docker compose up -d` จะรัน `init.sql` และ `02_policy_copay.sql` ใหม่
+## อัปเดต DB เดิมโดยไม่ล้างข้อมูล
 
-ถ้า DB เดิมสร้างไว้ก่อนมี `02_policy_copay.sql` ให้รันไฟล์นี้เพิ่มครั้งเดียวโดยไม่ต้องล้างข้อมูล (รันซ้ำได้ ไม่พัง):
+ถ้า DB สร้างไว้ก่อนมีไฟล์ใหม่ ให้รันไฟล์ที่ขาดตามลำดับ ทุกไฟล์รันซ้ำได้ ไม่พัง:
 
 ```powershell
-Get-Content ..\docker\postgres\02_policy_copay.sql -Raw -Encoding utf8 | docker exec -i thaiplease_postgres psql -U thaiplease_user -d thaiplease_db -v ON_ERROR_STOP=1
+foreach ($file in '02_policy_copay', '03_coupons', '04_cases', '05_missions', '06_budget_approvals') {
+  Get-Content "..\docker\postgres\$file.sql" -Raw -Encoding utf8 | docker exec -i thaiplease_postgres psql -U thaiplease_user -d thaiplease_db -v ON_ERROR_STOP=1
+}
 ```

@@ -178,7 +178,7 @@ function buildSeedData({ endDate }) {
     if (payment.status === 'FAILED') continue;
     const coins = Math.floor(payment.net_amount / BAHT_PER_COIN);
     if (coins === 0) continue;
-    coinLedger.push({ user_id: payment.user_id, payment_id: payment.payment_id, amount: coins, reason: 'PURCHASE_REWARD', created_at: payment.paid_at });
+    coinLedger.push({ user_id: payment.user_id, payment_id: payment.payment_id, amount: coins, reason: 'PAYMENT_REWARD', created_at: payment.paid_at });
     if (payment.status === 'REFUNDED') {
       // BR-08: แก้ด้วยรายการลบใหม่ ไม่แก้รายการเดิม
       coinLedger.push({ user_id: payment.user_id, payment_id: payment.payment_id, amount: -coins, reason: 'REFUND_REVERSAL', created_at: payment.paid_at });
