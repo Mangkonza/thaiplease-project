@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api, { getErrorMessage } from '../api';
+import ShopImageUpload from '../components/ShopImageUpload';
 
 const PRESET_CATEGORIES = [
   'อาหารและเครื่องดื่ม',
@@ -116,6 +117,7 @@ export default function MerchantShopsPage() {
                       {shop.category || 'ร้านค้า'} · {shop.area || 'ไม่ระบุพื้นที่'}
                     </small>
                     <StatusBadge status={shop.status} />
+                    <ShopImageUpload shop={shop} onUploaded={(imagePath) => setShops((current) => current.map((item) => (item.shop_id === shop.shop_id ? { ...item, image_path: imagePath } : item)))} />
                   </div>
                   {shop.status === 'ACTIVE' ? (
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -130,6 +132,12 @@ export default function MerchantShopsPage() {
                         to={`/merchant/shops/${shop.shop_id}/campaigns`}
                       >
                         จัดการแคมเปญ
+                      </Link>
+                      <Link
+                        className="button button-outline button-small"
+                        to={`/merchant/shops/${shop.shop_id}/qr`}
+                      >
+                        QR รับเงิน
                       </Link>
                     </div>
                   ) : (

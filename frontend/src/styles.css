@@ -185,3 +185,81 @@ textarea { resize: vertical; }
 .shop-nav .tab { text-decoration: none; }
 .shop-nav-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .shop-nav-tools select { width: auto; padding: 8px 10px; }
+
+/* สแกนจ่าย กระเป๋าเงิน PIN สลิป และ QR ของร้าน */
+.metric-grid.metric-grid-two { grid-template-columns: repeat(2, 1fr); }
+.narrow-page { max-width: 620px; margin: 0 auto; width: 100%; }
+.file-button { position: relative; overflow: hidden; }
+.file-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.text-link { color: var(--green); font-size: 12px; font-weight: 600; }
+.text-link:hover { text-decoration: underline; }
+
+.scan-card { display: flex; flex-direction: column; gap: 18px; align-items: center; }
+.scan-viewport { position: relative; width: min(100%, 340px); aspect-ratio: 1; overflow: hidden; border-radius: 22px; background: #1f2d29; display: grid; place-items: center; }
+.scan-viewport video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+.scan-viewport.active video { opacity: 1; }
+.scan-placeholder { color: rgba(255,255,255,.25); font-size: 90px; }
+.scan-frame { position: absolute; inset: 18%; border: 3px solid rgba(255,255,255,.85); border-radius: 18px; box-shadow: 0 0 0 999px rgba(0,0,0,.25); }
+.scan-card .button-row { justify-content: center; }
+
+.checkout-shop { display: flex; align-items: center; gap: 14px; margin: 6px 0 18px; }
+.checkout-shop img, .checkout-shop-mark { width: 58px; height: 58px; flex: none; border-radius: 15px; object-fit: cover; }
+.checkout-shop-mark { display: grid; place-items: center; background: var(--mint); color: var(--green-dark); font-size: 26px; font-weight: 700; }
+.checkout-shop div { display: flex; flex-direction: column; gap: 3px; }
+.wallet-strip { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #f2f7f3; font-size: 13px; }
+.wallet-strip strong { margin-right: auto; color: var(--green-dark); }
+.wallet-strip a { color: var(--green); font-weight: 600; }
+
+.wallet-hero { display: flex; flex-direction: column; gap: 6px; padding: 30px; border-radius: 20px; background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%); color: white; }
+.wallet-hero .eyebrow { color: rgba(255,255,255,.7); }
+.wallet-hero p { margin: 8px 0 0; color: rgba(255,255,255,.8); font-size: 14px; }
+.wallet-hero strong { font-size: 38px; letter-spacing: -1px; }
+.wallet-hero .button { align-self: flex-start; margin-top: 12px; }
+.button-light { background: white; color: var(--green-dark); }
+.quick-amounts { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 8px 14px; border: 1px solid var(--line); border-radius: 99px; background: white; color: var(--ink); font-size: 13px; }
+.chip.active { border-color: var(--green); background: var(--mint); color: var(--green-dark); font-weight: 600; }
+.section-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.section-title-row h2 { margin-bottom: 4px; }
+.amount-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; }
+.amount-stack b { font-size: 13px; white-space: nowrap; }
+.amount-stack small { font-size: 11px; }
+
+.pin-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(23,35,31,.55); }
+.pin-sheet { width: min(100%, 360px); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 24px 18px; border-radius: 22px; background: white; text-align: center; }
+.pin-sheet:focus { outline: none; }
+.pin-sheet h2 { margin: 0; font-size: 20px; }
+.pin-sheet p { margin: 0; }
+.pin-dots { display: flex; gap: 14px; margin: 10px 0; }
+.pin-dots span { width: 15px; height: 15px; border: 2px solid var(--green); border-radius: 50%; }
+.pin-dots span.filled { background: var(--green); }
+.pin-keys { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; margin-top: 6px; }
+.pin-keys button { height: 58px; border: 0; border-radius: 50%; background: #f1f5f2; color: var(--ink); font-size: 22px; font-weight: 600; }
+.pin-keys button:hover:not(:disabled) { background: var(--mint); }
+
+.slip-amount { margin: 4px 0 10px; color: var(--green-dark); font-size: 34px; font-weight: 700; letter-spacing: -1px; }
+.slip-ref { font-family: Consolas, monospace; font-size: 11px; overflow-wrap: anywhere; }
+.success-mark.refunded { background: #e9edf7; color: #586c9a; }
+
+.qr-card { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.qr-image { width: min(100%, 300px); aspect-ratio: 1; border: 1px solid var(--line); border-radius: 16px; }
+.qr-shop-name { font-size: 18px; color: var(--green-dark); }
+.qr-link { overflow-wrap: anywhere; font-size: 11px; }
+
+.shop-image-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
+.shop-image-preview { width: 64px; height: 64px; overflow: hidden; border-radius: 14px; background: var(--mint); display: grid; place-items: center; color: var(--green-dark); font-size: 24px; font-weight: 700; }
+.shop-image-preview img { width: 100%; height: 100%; object-fit: cover; }
+.shop-image-upload .notice { width: 100%; }
+.shop-card-art.has-image img, .storefront-art.has-image img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.shop-card-art.has-image::after, .storefront-art.has-image::before, .storefront-art.has-image::after { display: none; }
+.shop-card-art.has-image span, .storefront-art.has-image span { padding: 4px 8px; border-radius: 99px; background: rgba(255,255,255,.88); }
+
+@media (max-width: 560px) {
+  .pin-keys { grid-template-columns: repeat(3, 64px); }
+  .wallet-hero strong { font-size: 32px; }
+}
+@media print {
+  .topbar, .site-footer, .no-print { display: none !important; }
+  .page-wrap { margin: 0; }
+  .slip-card { box-shadow: none; border: 0; }
+}
