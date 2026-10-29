@@ -44,6 +44,17 @@ describe('calculateCheckout (D-12)', () => {
     assert.equal(result.subsidy_remaining.today, 0);
   });
 
+  test('without a lifetime cap only the daily and monthly caps apply', () => {
+    const policy = { ...POLICY, monthly_cap: 1000, lifetime_cap: null };
+    const result = calculateCheckout({ grossAmount: 100, policy, usage: { today: 0, month: 0, total: 50000 }, paidAt: PAID_AT });
+    assert.equal(result.government_subsidy, 60);
+    assert.deepEqual(result.subsidy_remaining, { today: 140, month: 940, total: null });
+
+    const monthFull = calculateCheckout({ grossAmount: 100, policy, usage: { today: 0, month: 1000, total: 50000 }, paidAt: PAID_AT });
+    assert.equal(monthFull.government_subsidy, 0);
+    assert.equal(monthFull.subsidy_status, 'CAP_REACHED');
+  });
+
   test('monthly and lifetime caps apply even when the daily cap has room', () => {
     const monthly = calculateCheckout({ grossAmount: 300, policy: POLICY, usage: { today: 0, month: 1990, total: 1990 }, paidAt: PAID_AT });
     assert.equal(monthly.government_subsidy, 10);

@@ -40,7 +40,9 @@ function calculateCheckout({ grossAmount, campaignDiscount = 0, couponDiscount =
     remaining = {
       today: Math.max(0, toSatang(policy.daily_cap) - toSatang(usage.today)),
       month: Math.max(0, toSatang(policy.monthly_cap) - toSatang(usage.month)),
-      total: Math.max(0, toSatang(policy.lifetime_cap) - toSatang(usage.total)),
+      // lifetime_cap เป็น null = ไม่มีเพดานรวมทั้งโครงการ
+      total: policy.lifetime_cap === null || policy.lifetime_cap === undefined
+        ? Infinity : Math.max(0, toSatang(policy.lifetime_cap) - toSatang(usage.total)),
     };
     if (!isWithinProgram(policy, paidAt)) {
       subsidyReason = 'OUTSIDE_PROGRAM';
@@ -64,7 +66,7 @@ function calculateCheckout({ grossAmount, campaignDiscount = 0, couponDiscount =
     subsidy_remaining: remaining && {
       today: toBaht(remaining.today - subsidy),
       month: toBaht(remaining.month - subsidy),
-      total: toBaht(remaining.total - subsidy),
+      total: remaining.total === Infinity ? null : toBaht(remaining.total - subsidy),
     },
   };
 }

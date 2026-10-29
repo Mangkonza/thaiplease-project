@@ -10,7 +10,8 @@ const NUMERIC_FIELDS = ['copay_percent', 'daily_cap', 'monthly_cap', 'lifetime_c
 function normalizePolicy(row) {
   if (!row) return null;
   const policy = { ...row };
-  for (const field of NUMERIC_FIELDS) policy[field] = Number(row[field]);
+  // lifetime_cap เป็น NULL ได้ = ไม่มีเพดานรวมทั้งโครงการ ต้องไม่แปลงเป็น 0
+  for (const field of NUMERIC_FIELDS) policy[field] = row[field] === null ? null : Number(row[field]);
   return policy;
 }
 
@@ -67,7 +68,9 @@ function validatePolicyInput(input) {
   if (typeof copay !== 'number' || !Number.isFinite(copay) || copay < 0 || copay > 100) {
     errors.push('copay_percent must be a number between 0 and 100');
   }
-  for (const field of ['daily_cap', 'monthly_cap', 'lifetime_cap', 'coupon_value', 'coupon_min_spend']) {
+  const hasLifetimeCap = input.lifetime_cap !== undefined && input.lifetime_cap !== null;
+  if (hasLifetimeCap && !isMoney(input.lifetime_cap)) errors.push('lifetime_cap must be empty or a non-negative amount with at most 2 decimals');
+  for (const field of ['daily_cap', 'monthly_cap', 'coupon_value', 'coupon_min_spend']) {
     if (!isMoney(input[field])) errors.push(`${field} must be a non-negative amount with at most 2 decimals`);
   }
   for (const field of ['baht_per_coin', 'coupon_coin_cost', 'coupon_valid_days']) {
@@ -82,7 +85,7 @@ function validatePolicyInput(input) {
   if (errors.length) return errors;
 
   if (input.monthly_cap < input.daily_cap) errors.push('monthly_cap must be at least daily_cap');
-  if (input.lifetime_cap < input.monthly_cap) errors.push('lifetime_cap must be at least monthly_cap');
+  if (hasLifetimeCap && input.lifetime_cap < input.monthly_cap) errors.push('lifetime_cap must be at least monthly_cap');
   if (input.coupon_value <= 0) errors.push('coupon_value must be greater than 0');
   if (input.coupon_min_spend < input.coupon_value) errors.push('coupon_min_spend must be at least coupon_value');
   if (input.program_end < input.program_start) errors.push('program_end must not be before program_start');
