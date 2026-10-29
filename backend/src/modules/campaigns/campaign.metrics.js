@@ -1,4 +1,5 @@
 const DAY_MS = 86400000;
+const BASELINE_DAYS = 7;
 const RATE_TEMPLATES = new Set([
   'PERCENT_DISCOUNT', 'FIXED_DISCOUNT', 'TIME_BASED', 'DAY_BASED',
   'NEW_CUSTOMER', 'COMEBACK_REWARD',
@@ -92,13 +93,14 @@ function evaluateCampaign({ campaign, assignments, payments, redemptions, now = 
     throw error;
   }
 
-  const duration = end.getTime() - start.getTime();
+  // ค่าฐานใช้ 7 วันก่อนเริ่มเสมอ ไม่ใช้ความยาวแคมเปญ เพราะแคมเปญที่ปิดก่อนกำหนด (เช่นตอน demo)
+  // อาจยาวแค่ไม่กี่นาที ทำให้ช่วงค่าฐานไม่มีรายการเลย
   const baseline = campaignKpi({
     templateCode: campaign.template_code,
     parameters: campaign.parameters,
     assignments,
     payments,
-    start: new Date(start.getTime() - duration),
+    start: new Date(start.getTime() - BASELINE_DAYS * DAY_MS),
     end: new Date(start.getTime() - 1),
   });
   const current = campaignKpi({

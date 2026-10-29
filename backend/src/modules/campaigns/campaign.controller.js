@@ -187,7 +187,8 @@ async function updateCampaign(req, res) {
     const nextName = name === undefined ? current.rows[0].name : name;
     const nextStart = startAt === undefined ? current.rows[0].start_at : startAt;
     const nextEnd = endAt === undefined ? current.rows[0].end_at : endAt;
-    const nextRatio = treatmentRatio === undefined ? current.rows[0].treatment_ratio : Number(treatmentRatio);
+    // pg คืน NUMERIC เป็น string ("0.5000") ต้องแปลงก่อนตรวจด้วย Number.isFinite
+    const nextRatio = Number(treatmentRatio === undefined ? current.rows[0].treatment_ratio : treatmentRatio);
     if (typeof nextName !== 'string' || !nextName.trim() || nextName.length > 150 ||
         !nextStart || !nextEnd || Number.isNaN(new Date(nextStart).getTime()) ||
         Number.isNaN(new Date(nextEnd).getTime()) || new Date(nextStart) >= new Date(nextEnd) ||
@@ -295,8 +296,10 @@ async function endCampaign(req, res) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+    // ปิดก่อนกำหนด = เลื่อน end_at มาเป็นตอนนี้ (D-06) ไม่อย่างนั้น evaluate จะรอจนถึง end_at เดิม
     const updated = await client.query(
-      `UPDATE campaigns SET status = 'ENDED', updated_at = NOW()
+      `UPDATE campaigns
+       SET status = 'ENDED', end_at = GREATEST(start_at, LEAST(end_at, NOW())), updated_at = NOW()
        WHERE campaign_id = $1 AND status = 'ACTIVE' RETURNING *`,
       [req.params.campaignId]
     );

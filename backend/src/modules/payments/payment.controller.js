@@ -2,16 +2,75 @@ const crypto = require('node:crypto');
 const db = require('../../config/db');
 const { quoteCampaignBenefit, recordRedemption } = require('../campaigns/campaign.service');
 const { UUID_PATTERN } = require('../../middlewares/shop.middleware');
+const { getActivePolicy, getSubsidyUsage } = require('../policies/policy.service');
+const { calculateCheckout } = require('./checkout.calculator');
 
-const BAHT_PER_COIN = 25;
+const DEFAULT_BAHT_PER_COIN = 25;
+
+const isValidAmount = (amount) => Number.isFinite(amount) && amount > 0 &&
+  amount <= 9999999999.99 && Math.abs(Math.round(amount * 100) - amount * 100) <= 1e-8;
+
+// ตรวจร้านแล้วคิดราคาตาม D-12 ใช้ร่วมกันระหว่างหน้าแสดงยอดก่อนจ่ายและการจ่ายจริง
+// ต้องเรียกใน transaction; ล็อกแถว users ของผู้จ่ายไว้ให้รายการของคนเดียวกันคิดเพดานต่อกันทีละรายการ
+async function priceCheckout(client, { shopId, userId, grossAmount, paidAt }) {
+  const shop = await client.query(
+    'SELECT shop_id, status FROM shops WHERE shop_id = $1 FOR SHARE',
+    [shopId]
+  );
+  if (!shop.rows.length) return { error: { status: 404, message: 'Shop not found' } };
+  if (shop.rows[0].status !== 'ACTIVE') return { error: { status: 409, message: 'Shop is not available for payments' } };
+
+  const benefit = await quoteCampaignBenefit(client, { shopId, userId, grossAmount, paidAt });
+  await client.query('SELECT user_id FROM users WHERE user_id = $1 FOR UPDATE', [userId]);
+  const policy = await getActivePolicy(client);
+  const usage = policy ? await getSubsidyUsage(client, userId, paidAt) : { today: 0, month: 0, total: 0 };
+  const breakdown = calculateCheckout({
+    grossAmount,
+    campaignDiscount: benefit ? benefit.discountAmount : 0,
+    policy,
+    usage,
+    paidAt,
+  });
+  return { benefit, policy, breakdown };
+}
+
+async function quotePayment(req, res) {
+  const { shop_id: shopId, gross_amount: grossAmount } = req.body;
+  const amount = Number(grossAmount);
+  if (!UUID_PATTERN.test(shopId || '') || !isValidAmount(amount)) {
+    return res.status(400).json({ success: false, message: 'shop_id and a positive gross_amount are required' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, paidAt: new Date() });
+    await client.query('ROLLBACK');
+    if (priced.error) return res.status(priced.error.status).json({ success: false, message: priced.error.message });
+    const bahtPerCoin = priced.policy ? priced.policy.baht_per_coin : DEFAULT_BAHT_PER_COIN;
+    return res.json({
+      success: true,
+      quote: {
+        ...priced.breakdown,
+        campaign_benefit: priced.benefit,
+        coins_estimate: Math.floor(priced.breakdown.shop_receives / bahtPerCoin) + (priced.benefit ? priced.benefit.bonusCoins : 0),
+      },
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Quote payment error:', error);
+    return res.status(500).json({ success: false, message: 'Unable to calculate payment' });
+  } finally {
+    client.release();
+  }
+}
 
 async function createPayment(req, res) {
   const { shop_id: shopId, request_key: requestKey, gross_amount: grossAmount } = req.body;
   const amount = Number(grossAmount);
 
   if (!UUID_PATTERN.test(shopId || '') || !requestKey || typeof requestKey !== 'string' || requestKey.length > 100 ||
-      !requestKey.trim() || !Number.isFinite(amount) || amount <= 0 ||
-      amount > 9999999999.99 || Math.abs(Math.round(amount * 100) - amount * 100) > 1e-8) {
+      !requestKey.trim() || !isValidAmount(amount)) {
     return res.status(400).json({
       success: false,
       message: 'shop_id, request_key, and a positive gross_amount are required',
@@ -34,30 +93,21 @@ async function createPayment(req, res) {
       return res.status(200).json({ success: true, payment: prior.rows[0], idempotent: true });
     }
 
-    const shop = await client.query(
-      'SELECT shop_id, status FROM shops WHERE shop_id = $1 FOR SHARE',
-      [shopId]
-    );
-    if (!shop.rows.length) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ success: false, message: 'Shop not found' });
-    }
-    if (shop.rows[0].status !== 'ACTIVE') {
-      await client.query('ROLLBACK');
-      return res.status(409).json({ success: false, message: 'Shop is not available for payments' });
-    }
-
     const paidAt = new Date();
-    const benefit = await quoteCampaignBenefit(client, {
-      shopId, userId: req.user.user_id, grossAmount: amount, paidAt,
-    });
-    const discountAmount = benefit ? Math.min(amount, benefit.discountAmount) : 0;
-    const netAmount = Number((amount - discountAmount).toFixed(2));
+    const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, paidAt });
+    if (priced.error) {
+      await client.query('ROLLBACK');
+      return res.status(priced.error.status).json({ success: false, message: priced.error.message });
+    }
+    const { benefit, policy, breakdown } = priced;
+    const netAmount = breakdown.shop_receives;
     const result = await client.query(
-      `INSERT INTO payments (request_key, user_id, shop_id, gross_amount, discount_amount, net_amount, status, paid_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS', $7)
+      `INSERT INTO payments (request_key, user_id, shop_id, gross_amount, discount_amount, net_amount,
+         coupon_discount, government_subsidy, citizen_paid, policy_version, status, paid_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'SUCCESS', $11)
        RETURNING *`,
-      [requestKey, req.user.user_id, shopId, amount, discountAmount, netAmount, paidAt]
+      [requestKey, req.user.user_id, shopId, amount, breakdown.campaign_discount, netAmount,
+        breakdown.coupon_discount, breakdown.government_subsidy, breakdown.citizen_paid, breakdown.policy_version, paidAt]
     );
     const payment = result.rows[0];
 
@@ -70,7 +120,7 @@ async function createPayment(req, res) {
       });
     }
 
-    const regularCoins = Math.floor(netAmount / BAHT_PER_COIN);
+    const regularCoins = Math.floor(netAmount / (policy ? policy.baht_per_coin : DEFAULT_BAHT_PER_COIN));
     if (regularCoins > 0) {
       await client.query(
         `INSERT INTO coin_ledger (user_id, payment_id, amount, reason)
@@ -92,6 +142,7 @@ async function createPayment(req, res) {
       payment,
       coins_earned: regularCoins + (benefit ? benefit.bonusCoins : 0),
       campaign_benefit: benefit,
+      breakdown,
     });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -113,4 +164,4 @@ function createRequestKey() {
   return crypto.randomUUID();
 }
 
-module.exports = { createPayment, createRequestKey };
+module.exports = { createPayment, quotePayment, createRequestKey };

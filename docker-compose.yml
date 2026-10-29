@@ -14,6 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./docker/postgres/02_policy_copay.sql:/docker-entrypoint-initdb.d/02_policy_copay.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U thaiplease_user -d thaiplease_db"]
       interval: 5s

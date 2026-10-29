@@ -78,6 +78,33 @@ export function describeKpi(kpi) {
   return KPI_TEXT[kpi] || kpi;
 }
 
+// KPI ของแคมเปญขึ้นกับประเภทโปร (D-04) ต้องตรงกับ backend/src/modules/campaigns/campaign.metrics.js
+const RATE_TEMPLATES = ['PERCENT_DISCOUNT', 'FIXED_DISCOUNT', 'TIME_BASED', 'DAY_BASED', 'NEW_CUSTOMER', 'COMEBACK_REWARD'];
+const FREQUENCY_TEMPLATES = ['COIN_MULTIPLIER', 'BONUS_COIN', 'FREQUENCY_REWARD'];
+
+export function campaignKpiKind(templateCode) {
+  if (RATE_TEMPLATES.includes(templateCode)) return 'rate';
+  if (FREQUENCY_TEMPLATES.includes(templateCode)) return 'frequency';
+  return 'aov';
+}
+
+// ค่า KPI ของแต่ละกลุ่ม: อัตรา (0-1) แสดงเป็น %
+export function formatCampaignMetric(value, templateCode) {
+  if (value === null || value === undefined) return 'คำนวณไม่ได้';
+  const kind = campaignKpiKind(templateCode);
+  if (kind === 'rate') return `${formatNumber(Number(value) * 100)}%`;
+  return `${formatNumber(Number(value))} ${kind === 'aov' ? 'บาท' : 'ครั้ง/คน'}`;
+}
+
+// uplift ของ KPI แบบอัตรา backend คูณ 100 มาแล้ว (เป็นจุด %) จึงห้ามคูณซ้ำ
+export function formatUplift(value, templateCode) {
+  if (value === null || value === undefined) return 'คำนวณไม่ได้';
+  const kind = campaignKpiKind(templateCode);
+  const unit = kind === 'rate' ? 'จุด %' : kind === 'aov' ? 'บาท' : 'ครั้ง/คน';
+  const sign = Number(value) > 0 ? '+' : '';
+  return `${sign}${formatNumber(Number(value))} ${unit}`;
+}
+
 // ข้อความตาม SRS 3.6.4 แยกตาม reason ที่ backend ส่งมา
 export function aiErrorMessage(responseBody) {
   switch (responseBody?.reason) {
@@ -92,5 +119,21 @@ export function aiErrorMessage(responseBody) {
       return responseBody?.message
         ? `สร้างรายงานไม่สำเร็จ: ${responseBody.message}`
         : 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ โปรดลองอีกครั้ง';
+  }
+}
+
+export function formatBaht(value) {
+  if (value === null || value === undefined) return '—';
+  return `${Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
+}
+
+// สถานะรัฐช่วยจ่ายจาก backend (payments/checkout.calculator.js)
+export function subsidyStatusText(status) {
+  switch (status) {
+    case 'APPLIED': return null;
+    case 'CAP_REACHED': return 'รัฐช่วยจ่ายได้ไม่เต็มสัดส่วน เพราะใช้สิทธิ์ถึงเพดานแล้ว';
+    case 'OUTSIDE_PROGRAM': return 'อยู่นอกช่วงเวลาโครงการ จึงไม่มีรัฐช่วยจ่าย';
+    case 'NO_POLICY': return 'ยังไม่มีการตั้งนโยบายโครงการ จึงไม่มีรัฐช่วยจ่าย';
+    default: return null;
   }
 }

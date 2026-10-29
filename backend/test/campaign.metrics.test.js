@@ -47,6 +47,22 @@ describe('evaluateCampaign', () => {
     assert.equal(result.uplift, 10);
   });
 
+  test('baseline covers the 7 days before start even when the campaign lasted only minutes', () => {
+    const assigned = assignments();
+    const shortCampaign = { ...campaign, start_at: '2026-01-08T00:00:00.000Z', end_at: '2026-01-08T00:02:00.000Z' };
+    // treatment 5 คนซื้อ 3 วันก่อนเริ่ม: อยู่ในช่วงค่าฐาน 7 วัน แต่ไม่อยู่ในช่วง 2 นาทีก่อนเริ่ม
+    const payments = paymentsFor(assigned.slice(0, 5).map((item) => item.user_id), '05');
+    const result = evaluateCampaign({
+      campaign: shortCampaign,
+      assignments: assigned,
+      payments,
+      redemptions: 3,
+      now: new Date('2026-01-08T00:05:00.000Z'),
+    });
+
+    assert.equal(result.baseline_metric, 0.25);
+  });
+
   test('returns inconclusive when either cohort has fewer than 20 eligible users', () => {
     const result = evaluateCampaign({
       campaign,

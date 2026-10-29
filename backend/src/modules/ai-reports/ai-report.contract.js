@@ -8,6 +8,8 @@ const SYSTEM_PROMPT = [
   'Input: aggregated weekly or monthly metrics of one shop, the previous period for comparison, and the promotion templates the shop may use.',
   'Write summary, problem, possible_causes and every reason in Thai, short and plain, using Thai words for metric names.',
   'Only use numbers that appear in the input. Do not claim that a promotion will certainly increase sales.',
+  'When you quote a number, copy it exactly or round it correctly (30.76 becomes 31 or 30.8, never 30).',
+  'possible_causes must come only from what the metrics show (for example fewer new customers or fewer orders); do not invent outside reasons such as competitors, weather or marketing.',
   `Return exactly ${SUGGESTION_COUNT} suggestions with rank 1, 2 and 3 and three different template_id values taken from allowed_promotion_templates.`,
   'Rank 1 must be the template whose target KPI addresses the biggest problem in the metrics.',
   'parameters must follow that template parameter_schema exactly: include every required key, respect minimum and maximum, and add no other keys.',
