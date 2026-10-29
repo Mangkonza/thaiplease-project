@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import api, { getErrorMessage } from '../api';
+import ShopNav from '../components/ShopNav';
 
 const futureDateTime = (days) => {
   const date = new Date(Date.now() + days * 86400000);
@@ -10,6 +11,8 @@ const futureDateTime = (days) => {
 
 export default function CampaignsPage() {
   const { shopId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -44,26 +47,27 @@ export default function CampaignsPage() {
     return () => { cancelled = true; };
   }, [shopId, load]);
 
-  async function generateSuggestions() {
-    setBusy(true);
-    setError('');
-    setNotice('');
-    try {
-      const { data } = await api.post(`/shops/${shopId}/ai-reports`, {});
-      setSuggestions(data.report.suggestions);
-      setNotice('AI สร้างข้อเสนอแคมเปญให้แล้ว');
-    } catch (requestError) {
-      setError(getErrorMessage(requestError));
-    } finally {
-      setBusy(false);
-    }
-  }
+  // ข้อเสนอที่เลือกมาจากหน้ายอดขาย (การ์ดข้อเสนอในรายงาน AI) ส่งมาทาง router state
+  const incoming = location.state?.suggestion;
+  // StrictMode ตอนพัฒนารัน effect สองครั้ง ถ้าเลือกซ้ำ backend จะตอบ 409 จึงจำว่าจัดการข้อเสนอไหนไปแล้ว
+  const handledSuggestion = useRef(null);
+  useEffect(() => {
+    if (!incoming || handledSuggestion.current === incoming.suggestion_id) return;
+    handledSuggestion.current = incoming.suggestion_id;
+    // ล้าง state ก่อน เพื่อไม่ให้ refresh แล้วเลือกซ้ำ
+    navigate(location.pathname, { replace: true, state: null });
+    Promise.resolve().then(() => chooseSuggestion(incoming));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ทำครั้งเดียวต่อข้อเสนอที่ส่งมา
+  }, [incoming]);
 
   async function chooseSuggestion(suggestion) {
     setBusy(true);
     setError('');
     try {
-      await api.post(`/ai-suggestions/${suggestion.suggestion_id}/select`, { shop_id: shopId });
+      // SELECTED = เคยเลือกไว้แล้วแต่ยังไม่ได้บันทึกฉบับร่าง ไม่ต้องเลือกซ้ำ
+      if (suggestion.status !== 'SELECTED') {
+        await api.post(`/ai-suggestions/${suggestion.suggestion_id}/select`, { shop_id: shopId });
+      }
       setSelected(suggestion);
       setCampaignParameters({ ...suggestion.parameters });
       setSettings({ ...settings, name: suggestion.template_name || suggestion.template_code });
@@ -105,7 +109,7 @@ export default function CampaignsPage() {
     setError('');
     try {
       await api.post(`/campaigns/${campaign.campaign_id}/${action}`);
-      setNotice(action === 'activate' ? 'เปิดแคมเปญแล้ว' : 'ปิดแคมเปญแล้ว');
+      setNotice({ activate: 'เปิดแคมเปญแล้ว', end: 'ปิดแคมเปญแล้ว', 'request-approval': 'ส่งให้ผู้ดูแลระบบอนุมัติแล้ว' }[action]);
       await load();
     } catch (requestError) {
       setError(getErrorMessage(requestError));
@@ -116,8 +120,8 @@ export default function CampaignsPage() {
 
   return (
     <div className="content-stack">
-      <Link className="back-link" to="/merchant/shops">← กลับไปร้านของฉัน</Link>
-      <div className="section-heading"><div><span className="eyebrow">SMART CAMPAIGNS</span><h1>แคมเปญของร้าน</h1><p className="muted">เลือกข้อเสนอจาก AI ตั้งค่า ทดลองใช้งาน และวัดผล</p></div><button className="button button-dark" disabled={busy} onClick={generateSuggestions}>{busy ? 'กำลังทำงาน…' : '✦ สร้างข้อเสนอจาก AI'}</button></div>
+      <ShopNav shopId={shopId} section="campaigns" />
+      <div className="section-heading"><div><span className="eyebrow">SMART CAMPAIGNS</span><h1>แคมเปญของร้าน</h1><p className="muted">เลือกข้อเสนอจาก AI ตั้งค่า ทดลองใช้งาน และวัดผล</p></div><Link className="button button-dark" to={`/merchant/shops/${shopId}/dashboard`}>✦ วิเคราะห์ร้านด้วย AI</Link></div>
       {error && <p className="notice notice-error" role="alert">{error}</p>}
       {notice && <p className="notice notice-success" role="status">{notice}</p>}
 
@@ -144,17 +148,30 @@ export default function CampaignsPage() {
         <button className="button button-primary" disabled={busy}>บันทึกฉบับร่าง</button>
       </form>}
 
-      {suggestions.length > 0 && <section className="content-stack"><div className="section-heading compact"><h2>ข้อเสนอจาก AI</h2><span className="muted">เลือกข้อเสนอที่เหมาะกับร้าน</span></div><div className="suggestion-grid">{suggestions.map((item) => <article className="card suggestion-card" key={item.suggestion_id}><span className="rank-label">ข้อเสนอ #{item.rank}</span><h3>{item.template_name || item.template_code}</h3><p>{item.reason}</p><div className="suggestion-parameters">{Object.entries(item.parameters).map(([key, value]) => <span key={key}><small>{key.replaceAll('_', ' ')}</small><b>{Array.isArray(value) ? value.join(', ') : String(value)}</b></span>)}</div><button className="button button-outline" disabled={busy} onClick={() => chooseSuggestion(item)}>เลือกข้อเสนอนี้</button></article>)}</div></section>}
+      {suggestions.length > 0 && <section className="content-stack"><div className="section-heading compact"><h2>ข้อเสนอจาก AI</h2><span className="muted">จากรายงาน AI ล่าสุด ดูบทวิเคราะห์เต็มได้ที่แท็บ "ยอดขายและ AI"</span></div><div className="suggestion-grid">{suggestions.map((item) => <article className="card suggestion-card" key={item.suggestion_id}><span className="rank-label">ข้อเสนอ #{item.rank}</span><h3>{item.template_name || item.template_code}</h3><p>{item.reason}</p><div className="suggestion-parameters">{Object.entries(item.parameters).map(([key, value]) => <span key={key}><small>{key.replaceAll('_', ' ')}</small><b>{Array.isArray(value) ? value.join(', ') : String(value)}</b></span>)}</div><button className="button button-outline" disabled={busy} onClick={() => chooseSuggestion(item)}>เลือกข้อเสนอนี้</button></article>)}</div></section>}
 
       <section className="card"><div className="section-heading compact"><h2>แคมเปญทั้งหมด</h2><span className="muted">{campaigns.length} รายการ</span></div>
         {campaigns.length ? <div className="list-rows">{campaigns.map((campaign) => <article className="list-row campaign-row" key={campaign.campaign_id}><div><strong>{campaign.name}</strong><small>{campaign.template_name} · {new Date(campaign.start_at).toLocaleDateString('th-TH')} – {new Date(campaign.end_at).toLocaleDateString('th-TH')}</small><CampaignStatus status={campaign.status} /></div><div className="button-row">
-          {campaign.status === 'DRAFT' && <button className="button button-primary button-small" disabled={busy} onClick={() => updateStatus(campaign, 'activate')}>เปิดแคมเปญ</button>}
+          {campaign.status === 'DRAFT' && <DraftActions campaign={campaign} busy={busy} onAction={updateStatus} />}
           {campaign.status === 'ACTIVE' && <button className="button button-outline button-small" disabled={busy} onClick={() => updateStatus(campaign, 'end')}>ปิดแคมเปญ</button>}
           {campaign.status === 'ENDED' && <Link className="button button-outline button-small" to={`/merchant/shops/${shopId}/campaigns/${campaign.campaign_id}`}>ดูผลแคมเปญ</Link>}
-        </div></article>)}</div> : <p className="empty-note">ยังไม่มีแคมเปญ สร้างข้อเสนอจาก AI เพื่อเริ่มต้น</p>}
+        </div></article>)}</div> : <p className="empty-note">ยังไม่มีแคมเปญ เริ่มจากวิเคราะห์ร้านด้วย AI ในแท็บ "ยอดขายและ AI" แล้วเลือกข้อเสนอ</p>}
       </section>
     </div>
   );
+}
+
+// แคมเปญแจกเหรียญต้องให้ Admin อนุมัติก่อนเปิด ต้องตรงกับ backend/src/modules/budget/budget.service.js
+const COIN_TEMPLATES = ['BONUS_COIN', 'COIN_MULTIPLIER', 'FREQUENCY_REWARD'];
+
+function DraftActions({ campaign, busy, onAction }) {
+  const activate = <button className="button button-primary button-small" disabled={busy} onClick={() => onAction(campaign, 'activate')}>เปิดแคมเปญ</button>;
+  if (!COIN_TEMPLATES.includes(campaign.template_code) || campaign.coin_approval_status === 'APPROVED') return activate;
+  if (campaign.coin_approval_status === 'PENDING') return <span className="status-badge status-pending">รอผู้ดูแลระบบอนุมัติ</span>;
+  return <>
+    {campaign.coin_approval_status === 'REJECTED' && <small className="muted">ไม่อนุมัติ: {campaign.coin_approval_note}</small>}
+    <button className="button button-primary button-small" disabled={busy} onClick={() => onAction(campaign, 'request-approval')}>ส่งขออนุมัติ</button>
+  </>;
 }
 
 function CampaignStatus({ status }) {

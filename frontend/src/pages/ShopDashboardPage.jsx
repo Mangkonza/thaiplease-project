@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import ShopRefundPanel from '../components/ShopRefundPanel';
+import ShopProgramBalancePanel from '../components/ShopProgramBalancePanel';
+import ShopNav from '../components/ShopNav';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -81,7 +84,10 @@ function MetricCard({ label, unit, value, previous, change, previousLabel }) {
   );
 }
 
-function SuggestionCard({ suggestion }) {
+// PROPOSED: เลือกไปสร้างแคมเปญได้ / SELECTED: เลือกแล้วแต่อาจยังไม่ได้บันทึกฉบับร่าง ให้กลับไปตั้งค่าต่อได้
+const SUGGESTION_ACTION = { PROPOSED: 'ใช้ข้อเสนอนี้สร้างแคมเปญ', SELECTED: 'ไปตั้งค่าแคมเปญต่อ' };
+
+function SuggestionCard({ suggestion, onUse }) {
   return (
     <div style={{
       background: '#fff',
@@ -139,6 +145,9 @@ function SuggestionCard({ suggestion }) {
         <Target style={{ width: 14, height: 14 }} />
         <span>KPI เป้าหมาย: <strong style={{ color: '#1e293b' }}>{describeKpi(suggestion.target_kpi)}</strong></span>
       </div>
+      {SUGGESTION_ACTION[suggestion.status]
+        ? <button className="button button-primary button-small" onClick={() => onUse(suggestion)}>{SUGGESTION_ACTION[suggestion.status]}</button>
+        : <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>เลือกข้อเสนออื่นของรายงานนี้ไปแล้ว</span>}
     </div>
   );
 }
@@ -161,7 +170,7 @@ function NumberCheck({ check }) {
   );
 }
 
-function ReportView({ report }) {
+function ReportView({ report, onUseSuggestion }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div style={{
@@ -190,7 +199,7 @@ function ReportView({ report }) {
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
           {report.suggestions.map((suggestion) => (
-            <SuggestionCard key={suggestion.suggestion_id} suggestion={suggestion} />
+            <SuggestionCard key={suggestion.suggestion_id} suggestion={suggestion} onUse={onUseSuggestion} />
           ))}
         </div>
       </div>
@@ -297,7 +306,7 @@ export default function ShopDashboardPage() {
       {/* ส่วนหัวแสดงชื่อร้านและปุ่มย้อนกลับ */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link to="/merchant/shops" style={{ color: '#64748b', display: 'flex', alignItems: 'center', textDecoration: 'none' }} title="กลับไปร้านค้าของฉัน">
+          <Link to="/merchant/shops" state={{ stay: true }} style={{ color: '#64748b', display: 'flex', alignItems: 'center', textDecoration: 'none' }} title="กลับไปร้านค้าของฉัน">
             <ArrowLeft style={{ width: 20, height: 20 }} />
           </Link>
           <div style={{ background: '#2e7d32', color: '#fff', borderRadius: 12, padding: 8, display: 'flex' }}>
@@ -311,6 +320,8 @@ export default function ShopDashboardPage() {
           </div>
         </div>
       </div>
+
+      <ShopNav shopId={shopId} section="dashboard" />
 
       {forbidden ? (
         <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#e11d48', padding: 24, borderRadius: 16, textAlign: 'center' }}>
@@ -452,7 +463,7 @@ export default function ShopDashboardPage() {
             ) : reportLoading ? (
               <div style={{ padding: '24px 0', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>กำลังโหลดรายงานที่บันทึกไว้...</div>
             ) : report ? (
-              <ReportView report={report} />
+              <ReportView report={report} onUseSuggestion={(suggestion) => navigate(`/merchant/shops/${shopId}/campaigns`, { state: { suggestion } })} />
             ) : (
               !isOngoingPeriod && (
                 <div style={{ padding: '28px 0', textAlign: 'center', color: '#64748b', fontSize: '0.9rem' }}>
@@ -461,6 +472,9 @@ export default function ShopDashboardPage() {
               )
             )}
           </section>
+
+          <ShopProgramBalancePanel shopId={shopId} />
+          <ShopRefundPanel shopId={shopId} />
         </>
       )}
     </div>

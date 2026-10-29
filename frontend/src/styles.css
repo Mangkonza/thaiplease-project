@@ -178,3 +178,10 @@ textarea { resize: vertical; }
   .form-grid, .metric-grid, .metric-comparison { grid-template-columns: 1fr 1fr; }.metric-card strong { font-size: 22px; }
   .section-heading { align-items: flex-start; flex-direction: column; }.section-heading > .button { align-self: flex-start; }.admin-shop { align-items: flex-start; flex-direction: column; }.admin-shop > div:first-child { max-width: 100%; }.campaign-row .button-row { width: 100%; }.site-footer { width: calc(100% - 28px); }
 }
+
+/* แถบเมนูของร้าน (components/ShopNav.jsx) */
+.shop-nav { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.shop-nav .tab-bar { border-bottom: 0; }
+.shop-nav .tab { text-decoration: none; }
+.shop-nav-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.shop-nav-tools select { width: auto; padding: 8px 10px; }
