@@ -3,9 +3,9 @@ const policyColumns = (alias) => `${alias}.policy_version, ${alias}.copay_percen
   ${alias}.monthly_cap, ${alias}.lifetime_cap, ${alias}.baht_per_coin, ${alias}.coupon_coin_cost,
   ${alias}.coupon_value, ${alias}.coupon_min_spend, ${alias}.coupon_valid_days,
   ${alias}.program_start::text AS program_start, ${alias}.program_end::text AS program_end,
-  ${alias}.note, ${alias}.created_by, ${alias}.created_at`;
+  ${alias}.total_budget, ${alias}.note, ${alias}.created_by, ${alias}.created_at`;
 
-const NUMERIC_FIELDS = ['copay_percent', 'daily_cap', 'monthly_cap', 'lifetime_cap', 'coupon_value', 'coupon_min_spend'];
+const NUMERIC_FIELDS = ['copay_percent', 'daily_cap', 'monthly_cap', 'lifetime_cap', 'coupon_value', 'coupon_min_spend', 'total_budget'];
 
 function normalizePolicy(row) {
   if (!row) return null;
@@ -69,6 +69,9 @@ function validatePolicyInput(input) {
     errors.push('copay_percent must be a number between 0 and 100');
   }
   const hasLifetimeCap = input.lifetime_cap !== undefined && input.lifetime_cap !== null;
+  if (input.total_budget !== undefined && input.total_budget !== null && (!isMoney(input.total_budget) || input.total_budget <= 0)) {
+    errors.push('total_budget must be empty or a positive amount with at most 2 decimals');
+  }
   if (hasLifetimeCap && !isMoney(input.lifetime_cap)) errors.push('lifetime_cap must be empty or a non-negative amount with at most 2 decimals');
   for (const field of ['daily_cap', 'monthly_cap', 'coupon_value', 'coupon_min_spend']) {
     if (!isMoney(input[field])) errors.push(`${field} must be a non-negative amount with at most 2 decimals`);

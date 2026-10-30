@@ -43,12 +43,26 @@ async function adminBudget(req, res) {
       owed: sum.owed + shop.owed, paid_out: sum.paid_out + shop.paid_out, pending: sum.pending + shop.pending,
     }), { owed: 0, paid_out: 0, pending: 0 });
     const round = (value) => Number(value.toFixed(2));
+    const paymentTotals = toNumbers(payments.rows[0]);
+    const couponTotals = toNumbers(coupons.rows[0]);
+    // งบที่ใช้ไปแล้ว = รัฐช่วยจ่าย + คูปองของรายการที่สำเร็จ, คูปองที่ออกแล้วแต่ยังไม่ใช้คือภาระผูกพัน
+    const spent = round(paymentTotals.government_subsidy + paymentTotals.coupon_discount);
+    const total = policy?.total_budget ?? null;
+    const programBudget = total === null ? null : {
+      total,
+      spent,
+      remaining: round(total - spent),
+      committed: couponTotals.active_value,
+      available: round(total - spent - couponTotals.active_value),
+      used_percent: Number(((spent / total) * 100).toFixed(1)),
+    };
     return res.json({
       success: true,
       policy,
-      payments: toNumbers(payments.rows[0]),
+      budget: programBudget,
+      payments: paymentTotals,
       coins: { by_reason: coinRows, outstanding },
-      coupons: toNumbers(coupons.rows[0]),
+      coupons: couponTotals,
       transfers: { owed: round(shopTotals.owed), paid_out: round(shopTotals.paid_out), pending: round(shopTotals.pending) },
       shops: shops.filter((shop) => shop.payments > 0 || shop.paid_out > 0),
     });

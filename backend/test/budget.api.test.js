@@ -40,64 +40,18 @@ function mockClient(handler) {
   return statements;
 }
 
-describe('coin campaign approval (D-18)', () => {
-  function activationHandler(approval) {
-    return (sql) => {
+describe('coin campaigns', () => {
+  // Admin คุมแคมเปญแจกเหรียญผ่านแม่แบบ (เปิด/ปิดและช่วงค่า) จึงไม่ต้องอนุมัติทีละแคมเปญ
+  test('a coin campaign activates without a separate approval', async () => {
+    mockPool();
+    mockClient((sql) => {
       if (sql.includes('SELECT shop_id, status FROM shops')) return [{ shop_id: SHOP_ID, status: 'ACTIVE' }];
-      if (sql.includes('SELECT * FROM campaigns WHERE')) return [{ campaign_id: CAMPAIGN_ID, status: 'DRAFT', template_id: 3, treatment_ratio: '0.5', coin_approval_status: approval }];
-      if (sql.includes('SELECT code FROM promotion_templates')) return [{ code: 'BONUS_COIN' }];
+      if (sql.includes('SELECT * FROM campaigns WHERE')) return [{ campaign_id: CAMPAIGN_ID, status: 'DRAFT', template_id: 3, treatment_ratio: '0.5' }];
       if (sql.includes("UPDATE campaigns SET status = 'ACTIVE'")) return [{ campaign_id: CAMPAIGN_ID, status: 'ACTIVE' }];
       return undefined;
-    };
-  }
-
-  test('a coin campaign cannot be activated before approval', async () => {
-    mockPool();
-    const statements = mockClient(activationHandler(null));
-    const response = await api.request('POST', `/api/v1/campaigns/${CAMPAIGN_ID}/activate`, { token: merchantToken });
-    assert.equal(response.status, 409);
-    assert.match(response.body.message, /admin approval/);
-    assert.ok(!statements.some((s) => s.sql.includes("SET status = 'ACTIVE'")));
-  });
-
-  test('an approved coin campaign activates', async () => {
-    mockPool();
-    mockClient(activationHandler('APPROVED'));
-    const response = await api.request('POST', `/api/v1/campaigns/${CAMPAIGN_ID}/activate`, { token: merchantToken });
-    assert.equal(response.status, 200);
-  });
-
-  test('the shop sends a draft for approval only once', async () => {
-    let returned = [{ campaign_id: CAMPAIGN_ID, coin_approval_status: 'PENDING' }];
-    let params;
-    mockPool((sql, values) => {
-      if (sql.includes("coin_approval_status = 'PENDING'")) { params = values; return returned; }
-      return undefined;
     });
-    const first = await api.request('POST', `/api/v1/campaigns/${CAMPAIGN_ID}/request-approval`, { token: merchantToken });
-    assert.equal(first.status, 200);
-    assert.deepEqual(params[1], ['BONUS_COIN', 'COIN_MULTIPLIER', 'FREQUENCY_REWARD']);
-    returned = [];
-    const again = await api.request('POST', `/api/v1/campaigns/${CAMPAIGN_ID}/request-approval`, { token: merchantToken });
-    assert.equal(again.status, 409);
-  });
-
-  test('admin approves with an audit log and must give a note to reject', async () => {
-    mockPool();
-    const statements = mockClient((sql) => (sql.includes('UPDATE campaigns SET coin_approval_status')
-      ? [{ campaign_id: CAMPAIGN_ID, shop_id: SHOP_ID, name: 'โบนัส', coin_approval_status: 'APPROVED' }] : undefined));
-    const approved = await api.request('POST', `/api/v1/admin/campaigns/${CAMPAIGN_ID}/approval`, { token: adminToken, body: { decision: 'APPROVE' } });
-    assert.equal(approved.status, 200);
-    assert.equal(statements.find((s) => s.sql.includes('audit_logs')).params[1], 'COIN_CAMPAIGN_APPROVED');
-    const noNote = await api.request('POST', `/api/v1/admin/campaigns/${CAMPAIGN_ID}/approval`, { token: adminToken, body: { decision: 'REJECT' } });
-    assert.equal(noNote.status, 400);
-  });
-
-  test('deciding a campaign that is not pending returns 409', async () => {
-    mockPool();
-    mockClient(() => undefined);
-    const response = await api.request('POST', `/api/v1/admin/campaigns/${CAMPAIGN_ID}/approval`, { token: adminToken, body: { decision: 'APPROVE' } });
-    assert.equal(response.status, 409);
+    const response = await api.request('POST', `/api/v1/campaigns/${CAMPAIGN_ID}/activate`, { token: merchantToken });
+    assert.equal(response.status, 200, JSON.stringify(response.body));
   });
 });
 
@@ -157,5 +111,64 @@ describe('program transfers to shops (D-14, D-17)', () => {
     assert.deepEqual(response.body.transfers, { owed: 180, paid_out: 100, pending: 80 });
     assert.equal(response.body.shops.length, 1);
     assert.equal(response.body.payments.government_subsidy, 160);
+  });
+});
+
+describe('project budget and shop detail', () => {
+  const { validatePolicyInput } = require('../src/modules/policies/policy.service');
+
+  test('remaining budget = total − (co-pay + coupons used), active coupons are a commitment', async () => {
+    mockPool((sql) => {
+      if (sql.includes('FROM project_policies')) return [{ policy_version: 3, copay_percent: '60.00', total_budget: '500000.00' }];
+      if (sql.includes('FROM payments') && sql.includes('refunded_payments')) return [{ government_subsidy: '22405.00', coupon_discount: '95.00' }];
+      if (sql.includes('FROM coupons')) return [{ active_value: '600.00' }];
+      return undefined;
+    });
+    const response = await api.request('GET', '/api/v1/admin/budget', { token: adminToken });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.budget, { total: 500000, spent: 22500, remaining: 477500, committed: 600, available: 476900, used_percent: 4.5 });
+  });
+
+  test('no total budget set means no budget block', async () => {
+    mockPool((sql) => {
+      if (sql.includes('FROM project_policies')) return [{ policy_version: 1, copay_percent: '60.00', total_budget: null }];
+      if (sql.includes('refunded_payments')) return [{ government_subsidy: '0', coupon_discount: '0' }];
+      if (sql.includes('FROM coupons')) return [{ active_value: '0' }];
+      return undefined;
+    });
+    const response = await api.request('GET', '/api/v1/admin/budget', { token: adminToken });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.budget, null);
+  });
+
+  test('total_budget is optional but must be positive', () => {
+    const base = { copay_percent: 60, daily_cap: 200, monthly_cap: 1000, baht_per_coin: 25, coupon_coin_cost: 100, coupon_value: 20,
+      coupon_min_spend: 100, coupon_valid_days: 30, program_start: '2026-10-01', program_end: '2027-03-31' };
+    assert.deepEqual(validatePolicyInput(base), []);
+    assert.deepEqual(validatePolicyInput({ ...base, total_budget: 500000 }), []);
+    assert.match(validatePolicyInput({ ...base, total_budget: 0 }).join(), /total_budget/);
+  });
+
+  test('shop detail returns the shop, sales, balance and recent payments', async () => {
+    mockPool((sql) => {
+      if (sql.includes('owner_status')) return [{ shop_id: SHOP_ID, name: 'ร้านทดสอบ', owner_email: 'm@example.com' }];
+      if (sql.includes('AS orders_30d')) return [{ orders: '12', gross: '1500.00', buyers: '8', orders_30d: '5', gross_30d: '600.00', last_paid_at: '2026-10-25T05:00:00Z' }];
+      if (sql.includes('FROM shops s')) return [BALANCE_ROW];
+      if (sql.includes('FROM payments p JOIN users')) return [{ payment_id: 'p1', gross_amount: '100.00', government_subsidy: '60.00', coupon_discount: '0', citizen_paid: '40.00' }];
+      return undefined;
+    });
+    const response = await api.request('GET', `/api/v1/admin/shops/${SHOP_ID}`, { token: adminToken });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.shop.name, 'ร้านทดสอบ');
+    assert.deepEqual([response.body.sales.orders, response.body.sales.gross, response.body.sales.buyers], [12, 1500, 8]);
+    assert.equal(response.body.sales.last_paid_at, '2026-10-25T05:00:00Z');
+    assert.equal(response.body.balance.pending, 80);
+    assert.equal(response.body.recent_payments[0].government_subsidy, 60);
+  });
+
+  test('shop detail returns 404 for an unknown shop and 403 for merchants', async () => {
+    mockPool(() => []);
+    assert.equal((await api.request('GET', `/api/v1/admin/shops/${SHOP_ID}`, { token: adminToken })).status, 404);
+    assert.equal((await api.request('GET', `/api/v1/admin/shops/${SHOP_ID}`, { token: merchantToken })).status, 403);
   });
 });

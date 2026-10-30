@@ -34,7 +34,7 @@ function percentDiscount(amount, percent) {
 
 async function quoteCampaignBenefit(client, { shopId, userId, grossAmount, paidAt }) {
   const result = await client.query(
-    `SELECT c.campaign_id, c.template_id, c.parameters, t.code AS template_code, a.group_type
+    `SELECT c.campaign_id, c.template_id, c.parameters, t.mechanic AS template_code, a.group_type
      FROM campaigns c
      JOIN promotion_templates t ON t.template_id = c.template_id
      JOIN campaign_assignments a ON a.campaign_id = c.campaign_id AND a.user_id = $2

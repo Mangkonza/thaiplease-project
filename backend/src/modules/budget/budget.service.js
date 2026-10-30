@@ -1,6 +1,3 @@
-// แคมเปญที่แจกเหรียญ ต้องให้ Admin อนุมัติก่อนเปิด (D-18)
-const COIN_TEMPLATES = ['BONUS_COIN', 'COIN_MULTIPLIER', 'FREQUENCY_REWARD'];
-
 // ยอดที่โครงการต้องโอน ยอดที่โอนแล้ว และยอดรอรับ ของทุกร้าน หรือร้านเดียวเมื่อส่ง shopId
 // ยอดรอรับติดลบได้ ถ้ามีการคืนเงินหลังโอนไปแล้ว (ร้านต้องคืนให้โครงการ)
 async function shopBalances(queryable, shopId = null) {
@@ -38,4 +35,4 @@ async function shopBalances(queryable, shopId = null) {
   }));
 }
 
-module.exports = { COIN_TEMPLATES, shopBalances };
+module.exports = { shopBalances };

@@ -39,9 +39,11 @@ async function redeemCoupon(req, res) {
     }
 
     const inserted = await client.query(
-      `INSERT INTO coupons (user_id, value, min_spend, coin_cost, policy_version, expires_at)
-       VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6))
-       RETURNING ${couponColumns}`,
+      `WITH c AS (
+         INSERT INTO coupons (user_id, value, min_spend, coin_cost, policy_version, expires_at)
+         VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6))
+         RETURNING *)
+       SELECT ${couponColumns} FROM c LEFT JOIN shops s ON s.shop_id = c.shop_id`,
       [userId, policy.coupon_value, policy.coupon_min_spend, policy.coupon_coin_cost, policy.policy_version, policy.coupon_valid_days]
     );
     await client.query(

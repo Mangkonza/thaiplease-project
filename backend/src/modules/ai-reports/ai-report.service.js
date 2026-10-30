@@ -22,8 +22,8 @@ class AiInvalidOutputError extends Error {
 
 async function loadActiveTemplates() {
   const result = await db.query(
-    `SELECT template_id, code, name, description, target_kpi, parameter_schema
-     FROM promotion_templates WHERE active = TRUE ORDER BY template_id`
+    `SELECT template_id, code, mechanic, name, description, target_kpi, parameter_schema
+     FROM promotion_templates WHERE active = TRUE AND archived_at IS NULL ORDER BY template_id`
   );
   return result.rows;
 }
@@ -76,7 +76,8 @@ function sanitizeAiContent(rawContent, templates) {
       s.parameters = {};
     }
 
-    const tCode = (matchedTemplate ? matchedTemplate.code : (s.template_code || s.code || '')).toUpperCase();
+    // กติกาพิเศษผูกกับกลไก ไม่ใช่รหัสแม่แบบ เพราะ Admin สร้างแม่แบบใหม่จากกลไกเดิมได้
+    const tCode = (matchedTemplate ? (matchedTemplate.mechanic || matchedTemplate.code) : (s.template_code || s.code || '')).toUpperCase();
 
     // แก้ปัญหา COMEBACK_REWARD: ตัดฟิลด์ target_days, max_discount ทิ้ง และแปลงเป็น discount_amount
     if (tCode === 'COMEBACK_REWARD') {
@@ -248,7 +249,7 @@ async function getReportById(reportId) {
   const row = reportResult.rows[0];
 
   const suggestionResult = await db.query(
-    `SELECT g.suggestion_id, g.rank, g.template_id, t.code AS template_code, t.name AS template_name,
+    `SELECT g.suggestion_id, g.rank, g.template_id, t.mechanic AS template_code, t.code AS template_ref, t.name AS template_name,
             g.parameters, g.reason, g.target_kpi, g.status
      FROM ai_suggestions g JOIN promotion_templates t ON t.template_id = g.template_id
      WHERE g.report_id = $1
@@ -300,8 +301,8 @@ async function listReports(shopId, period) {
 
 async function listTemplates() {
   const result = await db.query(
-    `SELECT template_id, code, name, description, target_kpi, parameter_schema, active
-     FROM promotion_templates ORDER BY template_id`
+    `SELECT template_id, code, mechanic, name, description, target_kpi, parameter_schema, active
+     FROM promotion_templates WHERE archived_at IS NULL ORDER BY template_id`
   );
   return result.rows;
 }
