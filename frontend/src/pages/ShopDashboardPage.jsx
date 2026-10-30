@@ -251,6 +251,12 @@ export default function ShopDashboardPage() {
   const period = dashboard?.period;
   const periodKey = period ? `${period.type}|${period.start}` : null;
 
+  // ตรวจสอบเงื่อนไขว่ามีข้อมูลคำสั่งซื้อเพียงพอให้ AI วิเคราะห์หรือไม่
+  const isInsufficientData =
+    Boolean(dashboard) &&
+    Number(dashboard?.metrics?.orders || 0) === 0 &&
+    Number(dashboard?.comparison?.metrics?.orders || 0) === 0;
+
   useEffect(() => {
     if (!periodKey) return undefined;
     let cancelled = false;
@@ -300,6 +306,9 @@ export default function ShopDashboardPage() {
   const reportLoading = periodKey !== null && savedReport.key !== periodKey;
   const generating = generation.running && generation.key === periodKey;
   const aiError = generation.key === periodKey ? generation.error : null;
+
+  // ตรวจสอบสถานะการปิดใช้งานปุ่ม
+  const isButtonDisabled = !period || generating || isOngoingPeriod || isInsufficientData;
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 32 }}>
@@ -426,7 +435,8 @@ export default function ShopDashboardPage() {
 
               <button
                 onClick={generateReport}
-                disabled={!period || generating || isOngoingPeriod}
+                disabled={isButtonDisabled}
+                title={isInsufficientData ? 'ข้อมูลช่วงเวลานี้ยังไม่เพียงพอสำหรับสร้างคำแนะนำ' : ''}
                 style={{
                   border: 'none',
                   background: 'var(--accent)',
@@ -435,8 +445,8 @@ export default function ShopDashboardPage() {
                   borderRadius: 10,
                   fontSize: '0.9rem',
                   fontWeight: '600',
-                  cursor: (!period || generating || isOngoingPeriod) ? 'not-allowed' : 'pointer',
-                  opacity: (!period || generating || isOngoingPeriod) ? 0.6 : 1,
+                  cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
+                  opacity: isButtonDisabled ? 0.6 : 1,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
@@ -467,7 +477,9 @@ export default function ShopDashboardPage() {
             ) : (
               !isOngoingPeriod && (
                 <div style={{ padding: '28px 0', textAlign: 'center', color: '#64748b', fontSize: '0.9rem' }}>
-                  ยังไม่มีรายงาน AI สำหรับช่วง {period ? formatPeriod(period) : ''} กด “วิเคราะห์ด้วย AI” เพื่อเริ่ม
+                  {isInsufficientData
+                    ? 'ข้อมูลช่วงเวลานี้ยังไม่เพียงพอสำหรับสร้างคำแนะนำ (ยอดออเดอร์เป็น 0)'
+                    : `ยังไม่มีรายงาน AI สำหรับช่วง ${period ? formatPeriod(period) : ''} กด “วิเคราะห์ด้วย AI” เพื่อเริ่ม`}
                 </div>
               )
             )}

@@ -58,11 +58,19 @@ function sanitizeAiContent(rawContent, templates) {
     if (t.code) {
       templateMap.set(String(t.code).toUpperCase(), t);
     }
+    if (t.mechanic) {
+      templateMap.set(String(t.mechanic).toUpperCase(), t);
+    }
   }
 
-  for (const s of content.suggestions) {
+  for (let i = 0; i < content.suggestions.length; i++) {
+    const s = content.suggestions[i];
     if (!s || typeof s !== 'object') continue;
 
+    // 1. ตรวจสอบ rank ให้เป็น integer 1, 2, 3
+    s.rank = Number(s.rank) || (i + 1);
+
+    // 2. แมปหา Template
     let matchedTemplate = null;
     if (s.template_id !== undefined && templateMap.has(String(s.template_id))) {
       matchedTemplate = templateMap.get(String(s.template_id));
@@ -72,6 +80,12 @@ function sanitizeAiContent(rawContent, templates) {
       matchedTemplate = templateMap.get(String(s.code).toUpperCase());
     }
 
+    if (matchedTemplate) {
+      s.template_id = Number(matchedTemplate.template_id);
+    } else {
+      s.template_id = Number(s.template_id);
+    }
+
     if (!s.parameters || typeof s.parameters !== 'object') {
       s.parameters = {};
     }
@@ -79,7 +93,7 @@ function sanitizeAiContent(rawContent, templates) {
     // กติกาพิเศษผูกกับกลไก ไม่ใช่รหัสแม่แบบ เพราะ Admin สร้างแม่แบบใหม่จากกลไกเดิมได้
     const tCode = (matchedTemplate ? (matchedTemplate.mechanic || matchedTemplate.code) : (s.template_code || s.code || '')).toUpperCase();
 
-    // แก้ปัญหา COMEBACK_REWARD: ตัดฟิลด์ target_days, max_discount ทิ้ง และแปลงเป็น discount_amount
+    // จัดการข้อเสนอ COMEBACK_REWARD
     if (tCode === 'COMEBACK_REWARD') {
       if (s.parameters.discount_amount === undefined || s.parameters.discount_amount === null) {
         const fallback = s.parameters.max_discount ?? s.parameters.discount ?? s.parameters.discount_value ?? 50;
@@ -89,7 +103,7 @@ function sanitizeAiContent(rawContent, templates) {
       delete s.parameters.max_discount;
     }
 
-    // ตรวจสอบและเกลี่ยพารามิเตอร์ตาม Parameter Schema ของแม่แบบ
+    // 3. ตรวจสอบและเกลี่ยพารามิเตอร์ตาม Parameter Schema ของแม่แบบ
     if (matchedTemplate && matchedTemplate.parameter_schema) {
       let schema = matchedTemplate.parameter_schema;
       if (typeof schema === 'string') {
@@ -101,36 +115,48 @@ function sanitizeAiContent(rawContent, templates) {
       }
 
       if (schema && typeof schema === 'object') {
-        const allowedProps = schema.properties ? Object.keys(schema.properties) : null;
+        const allowedProps = schema.properties ? Object.keys(schema.properties) : [];
         const requiredProps = Array.isArray(schema.required) ? schema.required : [];
 
-        // ลบฟิลด์ที่ไม่อนุญาต และโยกค่าไปยังฟิลด์ที่บังคับ
-        if (allowedProps && schema.additionalProperties === false) {
-          for (const key of Object.keys(s.parameters)) {
-            if (!allowedProps.includes(key)) {
-              for (const req of requiredProps) {
-                if (s.parameters[req] === undefined || s.parameters[req] === null) {
-                  if (req.includes('amount') && (key.includes('discount') || key.includes('amount') || key.includes('value'))) {
-                    s.parameters[req] = Number(s.parameters[key]) || s.parameters[key];
-                  } else if (req.includes('percent') && (key.includes('percent') || key.includes('rate'))) {
-                    s.parameters[req] = Number(s.parameters[key]) || s.parameters[key];
-                  } else if (req.includes('spend') && (key.includes('spend') || key.includes('purchase') || key.includes('min'))) {
-                    s.parameters[req] = Number(s.parameters[key]) || s.parameters[key];
-                  }
+        // ลบฟิลด์ส่วนเกินที่ไม่อยู่ใน allowedProps ทันที ไม่ต้องรอเงื่อนไข additionalProperties === false
+        for (const key of Object.keys(s.parameters)) {
+          if (!allowedProps.includes(key)) {
+            // โยกค่ายอดเงิน/ส่วนลดเข้าฟิลด์บังคับก่อนลบ
+            for (const req of requiredProps) {
+              if (s.parameters[req] === undefined || s.parameters[req] === null) {
+                if (req.includes('amount') && (key.includes('discount') || key.includes('amount') || key.includes('value'))) {
+                  s.parameters[req] = Number(s.parameters[key]) || s.parameters[key];
+                } else if (req.includes('percent') && (key.includes('percent') || key.includes('rate'))) {
+                  s.parameters[req] = Number(s.parameters[key]) || s.parameters[key];
+                } else if (req.includes('spend') && (key.includes('spend') || key.includes('purchase') || key.includes('min'))) {
+                  s.parameters[req] = Number(s.parameters[key]) || s.parameters[key];
                 }
               }
-              delete s.parameters[key];
+            }
+            delete s.parameters[key];
+          }
+        }
+
+        // แปลงประเภทตัวแปรให้เป็น Number หรือ Integer
+        for (const key of allowedProps) {
+          const propDef = schema.properties[key];
+          if (s.parameters[key] !== undefined && s.parameters[key] !== null) {
+            if (propDef.type === 'number' || propDef.type === 'integer') {
+              const num = Number(s.parameters[key]);
+              s.parameters[key] = isNaN(num) ? (propDef.minimum || 1) : (propDef.type === 'integer' ? Math.round(num) : num);
             }
           }
         }
 
-        // กำหนด Default Value สำหรับฟิลด์บังคับที่อาจขาดหาย
+        // กำหนด Default Value สำหรับฟิลด์บังคับที่ขาดหาย
         for (const req of requiredProps) {
           const propDef = schema.properties && schema.properties[req];
           if (s.parameters[req] === undefined || s.parameters[req] === null) {
             if (propDef) {
               if (propDef.type === 'number' || propDef.type === 'integer') {
-                if (req === 'discount_percent') s.parameters[req] = 10;
+                if (req === 'required_orders') s.parameters[req] = 2;
+                else if (req === 'reward_coins') s.parameters[req] = 10;
+                else if (req === 'discount_percent') s.parameters[req] = 10;
                 else if (req === 'discount_amount') s.parameters[req] = 50;
                 else if (req === 'min_spend') s.parameters[req] = 100;
                 else if (propDef.minimum !== undefined) s.parameters[req] = propDef.minimum;
@@ -140,11 +166,6 @@ function sanitizeAiContent(rawContent, templates) {
               } else if (propDef.type === 'boolean') {
                 s.parameters[req] = true;
               }
-            }
-          } else if (propDef && (propDef.type === 'number' || propDef.type === 'integer')) {
-            const num = Number(s.parameters[req]);
-            if (!isNaN(num)) {
-              s.parameters[req] = num;
             }
           }
         }
