@@ -52,7 +52,8 @@ export default function CheckoutPage() {
       .then(({ data }) => setShop(data.shop))
       .catch((requestError) => setError(requestError.response?.status === 404 ? 'ไม่พบร้านนี้ หรือร้านยังไม่เปิดให้บริการ' : getErrorMessage(requestError)));
     api.get('/users/me/coupons')
-      .then(({ data }) => setCoupons(data.coupons.filter((coupon) => coupon.status === 'ACTIVE')))
+      // คูปองจากภารกิจใช้ได้เฉพาะร้านที่กำหนด จึงแสดงเฉพาะคูปองที่ใช้ที่ร้านนี้ได้
+      .then(({ data }) => setCoupons(data.coupons.filter((coupon) => coupon.status === 'ACTIVE' && (!coupon.shop_id || coupon.shop_id === shopId))))
       .catch((requestError) => setError(getErrorMessage(requestError)));
     api.get('/users/me/wallet')
       .then(({ data }) => setWallet(data))
@@ -175,7 +176,7 @@ export default function CheckoutPage() {
       <form className="card checkout-card" onSubmit={openPin}>
         {wallet && <div className="wallet-strip"><span>ยอดเงินในกระเป๋า</span><strong>{formatBaht(wallet.balance)}</strong><Link to="/wallet">เติมเงิน</Link></div>}
         <label>ยอดซื้อ (บาท)<input type="number" min="0.01" step="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="เช่น 250.00" /></label>
-        {coupons.length > 0 && <label>คูปอง<select value={couponId} onChange={(event) => setCouponId(event.target.value)}><option value="">ไม่ใช้คูปอง</option>{coupons.map((coupon) => <option key={coupon.coupon_id} value={coupon.coupon_id}>ลด {formatBaht(coupon.value)} (ขั้นต่ำ {formatBaht(coupon.min_spend)}, ใช้ได้ถึง {new Date(coupon.expires_at).toLocaleDateString('th-TH')})</option>)}</select></label>}
+        {coupons.length > 0 && <label>คูปอง<select value={couponId} onChange={(event) => setCouponId(event.target.value)}><option value="">ไม่ใช้คูปอง</option>{coupons.map((coupon) => <option key={coupon.coupon_id} value={coupon.coupon_id}>ลด {formatBaht(coupon.value)}{coupon.shop_id ? ' (คูปองร้านนี้)' : ''} (ขั้นต่ำ {formatBaht(coupon.min_spend)}, ใช้ได้ถึง {new Date(coupon.expires_at).toLocaleDateString('th-TH')})</option>)}</select></label>}
         {shownQuote && <><Breakdown data={shownQuote} />
           <div className="coin-preview">ยอดนี้จะได้รับ <strong>{shownQuote.coins_estimate} coin</strong>{shownQuote.subsidy_remaining && <> · สิทธิ์รัฐช่วยจ่ายคงเหลือวันนี้หลังจ่าย {formatBaht(shownQuote.subsidy_remaining.today)}</>}</div></>}
         {note && <p className="notice">{note}</p>}

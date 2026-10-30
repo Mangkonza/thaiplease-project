@@ -10,6 +10,7 @@ const COUPON_STATUS = {
   ACTIVE: { text: 'ใช้ได้', className: 'status-active' },
   USED: { text: 'ใช้แล้ว', className: 'status-ended' },
   EXPIRED: { text: 'หมดอายุ', className: 'status-cancelled' },
+  REVOKED: { text: 'ถูกยกเลิก', className: 'status-cancelled' },
 };
 const shortDate = (value) => new Date(value).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -86,7 +87,7 @@ export default function CoinsPage() {
       </section>}
       {subsidy && <section className="card"><div className="section-heading compact"><div><h2>คูปองของฉัน</h2><span className="muted">ใช้ {couponCost} เหรียญแลกคูปองลด {formatBaht(subsidy.policy.coupon_value)} เมื่อซื้อขั้นต่ำ {formatBaht(subsidy.policy.coupon_min_spend)} อายุ {subsidy.policy.coupon_valid_days} วัน ใช้ได้ 1 ใบต่อรายการ</span></div>
         <button className="button button-primary" onClick={redeem} disabled={busy || balance === null || balance < couponCost}>{`แลก ${couponCost} เหรียญ`}</button></div>
-        {coupons.length ? <div className="list-rows">{coupons.map((coupon) => <div className="list-row" key={coupon.coupon_id}><div><strong>ลด {formatBaht(coupon.value)}</strong><small>ขั้นต่ำ {formatBaht(coupon.min_spend)} · {coupon.status === 'USED' ? `ใช้เมื่อ ${shortDate(coupon.used_at)}` : `ใช้ได้ถึง ${shortDate(coupon.expires_at)}`}</small></div><span className={`status-badge ${COUPON_STATUS[coupon.status].className}`}>{COUPON_STATUS[coupon.status].text}</span></div>)}</div> : <p className="empty-note">ยังไม่มีคูปอง</p>}
+        {coupons.length ? <div className="list-rows">{coupons.map((coupon) => <div className="list-row" key={coupon.coupon_id}><div><strong>ลด {formatBaht(coupon.value)}{coupon.shop_name ? ` · ใช้ได้เฉพาะ${coupon.shop_name}` : ''}</strong><small>{coupon.coin_cost === 0 ? 'รางวัลภารกิจ · ' : ''}ขั้นต่ำ {formatBaht(coupon.min_spend)} · {coupon.status === 'USED' ? `ใช้เมื่อ ${shortDate(coupon.used_at)}` : `ใช้ได้ถึง ${shortDate(coupon.expires_at)}`}</small></div><span className={`status-badge ${COUPON_STATUS[coupon.status].className}`}>{COUPON_STATUS[coupon.status].text}</span></div>)}</div> : <p className="empty-note">ยังไม่มีคูปอง</p>}
       </section>}
       <MissionsPanel />
       <div className="two-column">

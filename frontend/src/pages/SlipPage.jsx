@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import api, { getErrorMessage } from '../api';
 import { formatBaht, subsidyStatusText } from '../utils/format';
+import { missionCompletedText } from '../utils/missions';
 
 const dateTime = (value) => new Date(value).toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'medium', timeZone: 'Asia/Bangkok' });
 
@@ -46,7 +47,7 @@ export default function SlipPage() {
           {paid?.justPaid && paid.wallet_balance !== undefined && <div><dt>ยอดเงินคงเหลือ</dt><dd>{formatBaht(paid.wallet_balance)}</dd></div>}
         </dl>
         {note && <p className="notice">{note}</p>}
-        {paid?.missions_completed?.map((mission) => <p className="notice notice-success" key={mission.enrollment_id}>ภารกิจ "{mission.title}" สำเร็จ รับ {mission.reward_coins} เหรียญ</p>)}
+        {paid?.missions_completed?.map((mission) => <p className="notice notice-success" key={mission.enrollment_id}>{missionCompletedText(mission)}</p>)}
         {paid?.campaign_benefit && <p className="notice notice-success">ใช้สิทธิ์แคมเปญของร้านแล้ว</p>}
         <p className="fine-print">สลิปจากระบบชำระเงินจำลอง ไม่ใช่หลักฐานการโอนเงินจริง</p>
         <div className="button-row no-print">

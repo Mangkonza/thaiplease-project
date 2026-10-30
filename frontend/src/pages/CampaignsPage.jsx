@@ -109,7 +109,7 @@ export default function CampaignsPage() {
     setError('');
     try {
       await api.post(`/campaigns/${campaign.campaign_id}/${action}`);
-      setNotice({ activate: 'เปิดแคมเปญแล้ว', end: 'ปิดแคมเปญแล้ว', 'request-approval': 'ส่งให้ผู้ดูแลระบบอนุมัติแล้ว' }[action]);
+      setNotice({ activate: 'เปิดแคมเปญแล้ว', end: 'ปิดแคมเปญแล้ว' }[action]);
       await load();
     } catch (requestError) {
       setError(getErrorMessage(requestError));
@@ -161,17 +161,8 @@ export default function CampaignsPage() {
   );
 }
 
-// แคมเปญแจกเหรียญต้องให้ Admin อนุมัติก่อนเปิด ต้องตรงกับ backend/src/modules/budget/budget.service.js
-const COIN_TEMPLATES = ['BONUS_COIN', 'COIN_MULTIPLIER', 'FREQUENCY_REWARD'];
-
 function DraftActions({ campaign, busy, onAction }) {
-  const activate = <button className="button button-primary button-small" disabled={busy} onClick={() => onAction(campaign, 'activate')}>เปิดแคมเปญ</button>;
-  if (!COIN_TEMPLATES.includes(campaign.template_code) || campaign.coin_approval_status === 'APPROVED') return activate;
-  if (campaign.coin_approval_status === 'PENDING') return <span className="status-badge status-pending">รอผู้ดูแลระบบอนุมัติ</span>;
-  return <>
-    {campaign.coin_approval_status === 'REJECTED' && <small className="muted">ไม่อนุมัติ: {campaign.coin_approval_note}</small>}
-    <button className="button button-primary button-small" disabled={busy} onClick={() => onAction(campaign, 'request-approval')}>ส่งขออนุมัติ</button>
-  </>;
+  return <button className="button button-primary button-small" disabled={busy} onClick={() => onAction(campaign, 'activate')}>เปิดแคมเปญ</button>;
 }
 
 function CampaignStatus({ status }) {

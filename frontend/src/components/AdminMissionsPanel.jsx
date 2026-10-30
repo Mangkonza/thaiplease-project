@@ -1,18 +1,45 @@
 import { useEffect, useState } from 'react';
 import api, { getErrorMessage } from '../api';
+import { MISSION_TYPES, REWARD_TYPES, missionGoalText, missionRewardText } from '../utils/missions';
 
-const EMPTY_FORM = { title: '', description: '', target_count: '2', window_days: '30', reward_coins: '50' };
+const EMPTY_FORM = {
+  title: '', description: '', mission_type: 'NEW_SHOPS', target_count: '2', target_amount: '1000', shop_id: '', window_days: '30',
+  reward_type: 'COINS', reward_coins: '50', reward_shop_id: '', reward_coupon_value: '30', reward_coupon_min_spend: '100', reward_coupon_days: '30',
+};
 
-// Admin สร้างและปิดภารกิจ (D-16)
+// ค่าในฟอร์ม → body ของ POST /admin/missions เฉพาะช่องที่ใช้กับแบบที่เลือก
+function toBody(form) {
+  const body = {
+    title: form.title, description: form.description || null, mission_type: form.mission_type,
+    window_days: Number(form.window_days), reward_type: form.reward_type,
+  };
+  if (form.mission_type === 'SPEND_TOTAL') body.target_amount = Number(form.target_amount);
+  else body.target_count = Number(form.target_count);
+  if (form.mission_type !== 'NEW_SHOPS' && form.shop_id) body.shop_id = form.shop_id;
+  if (form.reward_type === 'COINS') body.reward_coins = Number(form.reward_coins);
+  else {
+    Object.assign(body, {
+      reward_shop_id: form.reward_shop_id, reward_coupon_value: Number(form.reward_coupon_value),
+      reward_coupon_min_spend: Number(form.reward_coupon_min_spend), reward_coupon_days: Number(form.reward_coupon_days),
+    });
+  }
+  return body;
+}
+
+// Admin สร้างและปิดภารกิจ: เลือกเงื่อนไข (ร้านใหม่/จำนวนครั้ง/ยอดรวม) และรางวัล (เหรียญ/คูปองเฉพาะร้านที่โครงการออกเงิน)
 export default function AdminMissionsPanel() {
   const [missions, setMissions] = useState([]);
+  const [shops, setShops] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.get('/admin/missions')
-      .then(({ data }) => setMissions(data.missions))
+    Promise.all([api.get('/admin/missions'), api.get('/admin/shops', { params: { status: 'ACTIVE' } })])
+      .then(([missionResponse, shopResponse]) => {
+        setMissions(missionResponse.data.missions);
+        setShops(shopResponse.data.shops);
+      })
       .catch((requestError) => setError(getErrorMessage(requestError)));
   }, []);
 
@@ -34,13 +61,7 @@ export default function AdminMissionsPanel() {
 
   async function create(event) {
     event.preventDefault();
-    const ok = await run(() => api.post('/admin/missions', {
-      title: form.title,
-      description: form.description || null,
-      target_count: Number(form.target_count),
-      window_days: Number(form.window_days),
-      reward_coins: Number(form.reward_coins),
-    }));
+    const ok = await run(() => api.post('/admin/missions', toBody(form)));
     if (ok) setForm(EMPTY_FORM);
   }
 
@@ -50,24 +71,36 @@ export default function AdminMissionsPanel() {
   }
 
   const field = (key) => ({ value: form[key], onChange: (event) => setForm({ ...form, [key]: event.target.value }) });
+  const shopOptions = shops.map((shop) => <option key={shop.shop_id} value={shop.shop_id}>{shop.name}</option>);
   return (
     <div className="content-stack">
       <section className="card">
         <div className="section-heading compact"><h2>สร้างภารกิจใหม่</h2></div>
-        <p className="muted">ประชาชนกดรับ แล้วซื้อจากร้านที่ไม่เคยซื้อมาก่อนให้ครบตามจำนวนภายในเวลาที่กำหนด</p>
         <form className="form-grid" onSubmit={create}>
-        <label>ชื่อภารกิจ<input required maxLength={200} {...field('title')} /></label>
-        <label>รายละเอียด<input maxLength={1000} {...field('description')} /></label>
-        <label>จำนวนร้านใหม่<input type="number" min="1" max="50" step="1" required {...field('target_count')} /></label>
-        <label>ภายในกี่วันหลังกดรับ<input type="number" min="1" max="365" step="1" required {...field('window_days')} /></label>
-        <label>เหรียญรางวัล<input type="number" min="1" max="100000" step="1" required {...field('reward_coins')} /></label>
-        <div className="button-row"><button className="button button-primary" disabled={busy}>สร้างภารกิจ</button></div>
+          <label>ชื่อภารกิจ<input required maxLength={200} {...field('title')} /></label>
+          <label>รายละเอียด<input maxLength={1000} {...field('description')} /></label>
+          <label>เงื่อนไข<select {...field('mission_type')}>{MISSION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
+          {form.mission_type === 'SPEND_TOTAL'
+            ? <label>ยอดใช้จ่ายรวม (บาท)<input type="number" min="1" step="0.01" required {...field('target_amount')} /></label>
+            : <label>{form.mission_type === 'NEW_SHOPS' ? 'จำนวนร้านใหม่' : 'จำนวนครั้ง'}<input type="number" min="1" max="50" step="1" required {...field('target_count')} /></label>}
+          {form.mission_type !== 'NEW_SHOPS' && <label>นับเฉพาะร้าน<select {...field('shop_id')}><option value="">ร้านใดก็ได้</option>{shopOptions}</select></label>}
+          <label>ภายในกี่วันหลังกดรับ<input type="number" min="1" max="365" step="1" required {...field('window_days')} /></label>
+          <label>รางวัล<select {...field('reward_type')}>{REWARD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
+          {form.reward_type === 'COINS'
+            ? <label>เหรียญรางวัล<input type="number" min="1" max="100000" step="1" required {...field('reward_coins')} /></label>
+            : <>
+              <label>คูปองใช้ได้ที่ร้าน<select required {...field('reward_shop_id')}><option value="">เลือกร้าน</option>{shopOptions}</select></label>
+              <label>มูลค่าคูปอง (บาท)<input type="number" min="1" step="0.01" required {...field('reward_coupon_value')} /></label>
+              <label>ยอดซื้อขั้นต่ำ (บาท)<input type="number" min="0" step="0.01" required {...field('reward_coupon_min_spend')} /></label>
+              <label>คูปองมีอายุ (วัน)<input type="number" min="1" max="365" step="1" required {...field('reward_coupon_days')} /></label>
+            </>}
+          <div className="button-row"><button className="button button-primary" disabled={busy}>สร้างภารกิจ</button></div>
         </form>
         {error && <p className="notice notice-error" role="alert">{error}</p>}
       </section>
       <section className="card"><div className="section-heading compact"><h2>ภารกิจทั้งหมด</h2><span className="muted">{missions.length} ภารกิจ</span></div>
         {missions.length ? <div className="list-rows">{missions.map((mission) => <article className="list-row" key={mission.mission_id}>
-          <div><strong>{mission.title}</strong><small>ร้านใหม่ {mission.target_count} ร้าน ภายใน {mission.window_days} วัน · รางวัล {mission.reward_coins} เหรียญ</small><small>รับแล้ว {mission.accepted_count} คน · สำเร็จ {mission.completed_count} คน · สร้างโดย {mission.created_by_name || 'ระบบ'}</small></div>
+          <div><strong>{mission.title}</strong><small>{missionGoalText(mission)} · รางวัล {missionRewardText(mission)}</small><small>รับแล้ว {mission.accepted_count} คน · สำเร็จ {mission.completed_count} คน · สร้างโดย {mission.created_by_name || 'ระบบ'}</small></div>
           {mission.status === 'ACTIVE'
             ? <button className="button button-outline button-small" disabled={busy} onClick={() => close(mission)}>ปิดภารกิจ</button>
             : <span className="status-badge status-ended">ปิดแล้ว</span>}

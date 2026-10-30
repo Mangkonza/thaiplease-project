@@ -47,7 +47,7 @@ export default function AdminCasesPanel() {
 
   return (
     <section className="card">
-      <div className="section-heading compact"><div><h2>คำขอคืนเงินและเรื่องร้องเรียน</h2><span className="muted">คำขอคืนเงินตัดสินแทนร้านได้เมื่อร้านไม่ตอบเกิน 3 วัน</span></div>
+      <div className="section-heading compact"><div><h2>คำขอคืนเงินและเรื่องร้องเรียน</h2></div>
         <label>สถานะ<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="PENDING">รอพิจารณา</option><option value="">ทั้งหมด</option><option value="APPROVED">อนุมัติแล้ว</option><option value="REJECTED">ไม่อนุมัติ</option><option value="RESOLVED">ปิดเรื่องแล้ว</option></select></label></div>
       {error && <p className="notice notice-error" role="alert">{error}</p>}
       {cases.length ? <div className="list-rows">{cases.map((item) => <article className="list-row" key={item.case_id}>

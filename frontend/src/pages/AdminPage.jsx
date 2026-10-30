@@ -1,70 +1,60 @@
 import { useEffect, useState } from 'react';
+import { Inbox, LayoutDashboard, Settings, Store, Tags, Trophy, Wallet } from 'lucide-react';
 import api, { getErrorMessage } from '../api';
 import AdminPolicyPanel from '../components/AdminPolicyPanel';
 import AdminCasesPanel from '../components/AdminCasesPanel';
 import AdminMissionsPanel from '../components/AdminMissionsPanel';
 import AdminBudgetPanel from '../components/AdminBudgetPanel';
-import AdminCoinApprovalsPanel from '../components/AdminCoinApprovalsPanel';
+import AdminShopsPanel from '../components/AdminShopsPanel';
+import AdminDashboardPanel from '../components/AdminDashboardPanel';
+import AdminTemplatesPanel from '../components/AdminTemplatesPanel';
+
+const MENU = [
+  { key: 'overview', label: 'ภาพรวม', Icon: LayoutDashboard },
+  { key: 'shops', label: 'ร้านค้า', Icon: Store },
+  { key: 'budget', label: 'งบโครงการ', Icon: Wallet },
+  { key: 'templates', label: 'แม่แบบแคมเปญ', Icon: Tags },
+  { key: 'cases', label: 'คำร้อง', Icon: Inbox },
+  { key: 'missions', label: 'ภารกิจ', Icon: Trophy },
+  { key: 'policy', label: 'นโยบายโครงการ', Icon: Settings },
+];
 
 export default function AdminPage() {
-  const [shops, setShops] = useState([]);
-  const [logs, setLogs] = useState([]);
-  const [view, setView] = useState('shops');
+  const [view, setView] = useState('overview');
+  const [pendingShops, setPendingShops] = useState(null);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
 
-  async function load() {
-    const [shopResponse, logResponse] = await Promise.all([
-      api.get('/admin/shops', { params: { status: 'PENDING' } }),
-      api.get('/admin/audit-logs', { params: { limit: 50 } }),
-    ]);
-    setShops(shopResponse.data.shops);
-    setLogs(logResponse.data.audit_logs);
-  }
   useEffect(() => {
-    Promise.all([
-      api.get('/admin/shops', { params: { status: 'PENDING' } }),
-      api.get('/admin/audit-logs', { params: { limit: 50 } }),
-    ]).then(([shopResponse, logResponse]) => {
-      setShops(shopResponse.data.shops);
-      setLogs(logResponse.data.audit_logs);
-    }).catch((requestError) => setError(getErrorMessage(requestError)));
+    api.get('/admin/shops', { params: { status: 'PENDING' } })
+      .then(({ data }) => setPendingShops(data.shops.length))
+      .catch((requestError) => setError(getErrorMessage(requestError)));
   }, []);
 
-  async function review(shop, status) {
-    let reason;
-    if (status === 'SUSPENDED') {
-      reason = window.prompt(`กรุณาระบุเหตุผลที่ไม่อนุมัติร้าน "${shop.name}"`);
-      if (!reason?.trim()) return;
-    }
-    setBusy(true);
-    setError('');
-    try {
-      await api.patch(`/admin/shops/${shop.shop_id}/status`, { status, reason });
-      await load();
-    } catch (requestError) {
-      setError(getErrorMessage(requestError));
-    } finally {
-      setBusy(false);
-    }
-  }
-
+  const current = MENU.find((item) => item.key === view);
   return (
-    <div className="content-stack">
-      <div className="section-heading"><div><span className="eyebrow">ADMIN CONSOLE</span><h1>จัดการระบบ</h1><p className="muted">ตรวจสอบคำขอร้านค้า คำร้องของประชาชน และติดตามกิจกรรมสำคัญ</p></div></div>
-      <div className="tab-bar"><button className={view === 'shops' ? 'tab active' : 'tab'} onClick={() => setView('shops')}>คำขอร้านค้า <span>{shops.length}</span></button><button className={view === 'budget' ? 'tab active' : 'tab'} onClick={() => setView('budget')}>งบโครงการ</button><button className={view === 'coin-campaigns' ? 'tab active' : 'tab'} onClick={() => setView('coin-campaigns')}>แคมเปญแจกเหรียญ</button><button className={view === 'cases' ? 'tab active' : 'tab'} onClick={() => setView('cases')}>คำร้อง</button><button className={view === 'missions' ? 'tab active' : 'tab'} onClick={() => setView('missions')}>ภารกิจ</button><button className={view === 'policy' ? 'tab active' : 'tab'} onClick={() => setView('policy')}>นโยบายโครงการ</button><button className={view === 'logs' ? 'tab active' : 'tab'} onClick={() => setView('logs')}>Audit log</button></div>
-      {error && <p className="notice notice-error" role="alert">{error}</p>}
-      {view === 'policy' && <AdminPolicyPanel />}
-      {view === 'budget' && <AdminBudgetPanel />}
-      {view === 'coin-campaigns' && <AdminCoinApprovalsPanel />}
-      {view === 'cases' && <AdminCasesPanel />}
-      {view === 'missions' && <AdminMissionsPanel />}
-      {view === 'shops' && <section className="card"><div className="section-heading compact"><h2>ร้านที่รออนุมัติ</h2><span className="muted">{shops.length} ร้าน</span></div>
-        {shops.length ? <div className="list-rows">{shops.map((shop) => <article className="list-row admin-shop" key={shop.shop_id}><div><strong>{shop.name}</strong><small>{shop.owner_name || shop.owner_email} · {shop.category || 'ร้านค้า'} · {shop.area || 'ไม่ระบุพื้นที่'}</small><p>{shop.description}</p><span className="status-badge status-pending">รออนุมัติ</span></div><div className="button-row"><button className="button button-primary button-small" disabled={busy} onClick={() => review(shop, 'ACTIVE')}>อนุมัติ</button><button className="button button-outline button-small" disabled={busy} onClick={() => review(shop, 'SUSPENDED')}>ไม่อนุมัติ</button></div></article>)}</div> : <p className="empty-note">ไม่มีร้านที่รออนุมัติ</p>}
-      </section>}
-      {view === 'logs' && <section className="card"><div className="section-heading compact"><h2>Audit log ล่าสุด</h2><span className="muted">{logs.length} รายการ</span></div>
-        {logs.length ? <div className="table-wrap"><table><thead><tr><th>เวลา</th><th>ผู้กระทำ</th><th>การกระทำ</th><th>รายการ</th><th>รายละเอียด</th></tr></thead><tbody>{logs.map((log) => <tr key={log.audit_id}><td>{new Date(log.created_at).toLocaleString('th-TH')}</td><td>{log.actor_id?.slice(0, 8) || 'ระบบ'}</td><td>{log.action}</td><td>{log.entity_type}</td><td><code>{JSON.stringify(log.detail)}</code></td></tr>)}</tbody></table></div> : <p className="empty-note">ยังไม่มี audit log</p>}
-      </section>}
+    <div className="admin-layout">
+      <nav className="admin-sidebar" aria-label="เมนูผู้ดูแลระบบ">
+        <span className="eyebrow">ADMIN</span>
+        {MENU.map(({ key, label, Icon }) => (
+          <button key={key} type="button" className={view === key ? 'admin-menu-item active' : 'admin-menu-item'}
+            aria-current={view === key ? 'page' : undefined} onClick={() => setView(key)}>
+            <Icon size={18} aria-hidden="true" />
+            <span>{label}</span>
+            {key === 'shops' && pendingShops > 0 && <b className="admin-menu-badge">{pendingShops}</b>}
+          </button>
+        ))}
+      </nav>
+      <div className="admin-content">
+        <h1 className="admin-title">{current.label}</h1>
+        {error && <p className="notice notice-error" role="alert">{error}</p>}
+        {view === 'overview' && <AdminDashboardPanel onOpen={setView} />}
+        {view === 'shops' && <AdminShopsPanel onPendingCount={setPendingShops} />}
+        {view === 'budget' && <AdminBudgetPanel />}
+        {view === 'templates' && <AdminTemplatesPanel />}
+        {view === 'cases' && <AdminCasesPanel />}
+        {view === 'missions' && <AdminMissionsPanel />}
+        {view === 'policy' && <AdminPolicyPanel />}
+      </div>
     </div>
   );
 }

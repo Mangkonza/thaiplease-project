@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api, { getErrorMessage } from '../api';
+import { missionGoalText, missionProgressText, missionRewardText } from '../utils/missions';
 
 const ENROLLMENT_STATUS = {
   IN_PROGRESS: { text: 'กำลังทำ', className: 'status-pending' },
@@ -8,7 +9,7 @@ const ENROLLMENT_STATUS = {
 };
 const shortDate = (value) => new Date(value).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 
-// ภารกิจของประชาชน (D-16): กดรับก่อน แล้วค่อยนับความคืบหน้า
+// ภารกิจของประชาชน: กดรับก่อน แล้วค่อยนับความคืบหน้า รางวัลเป็นเหรียญหรือคูปองเฉพาะร้าน
 export default function MissionsPanel() {
   const [missions, setMissions] = useState([]);
   const [error, setError] = useState('');
@@ -41,11 +42,10 @@ export default function MissionsPanel() {
       {missions.length ? <div className="list-rows">{missions.map((mission) => {
         const { enrollment } = mission;
         return <article className="list-row" key={mission.mission_id}>
-          <div><strong>{mission.title} · รับ {mission.reward_coins} เหรียญ</strong>
-            {mission.description && <small>{mission.description}</small>}
-            {enrollment
-              ? <small>ร้านใหม่ {enrollment.progress}/{mission.target_count} ร้าน · {enrollment.status === 'COMPLETED' ? `สำเร็จเมื่อ ${shortDate(enrollment.completed_at)}` : `ทำได้ถึง ${shortDate(enrollment.deadline_at)}`}</small>
-              : <small>ลองร้านใหม่ {mission.target_count} ร้าน ภายใน {mission.window_days} วันหลังกดรับ</small>}
+          <div><strong>{mission.title}</strong>
+            <small>{missionGoalText(mission)}</small>
+            <small>รางวัล: {missionRewardText(mission)}</small>
+            {enrollment && <small>ความคืบหน้า {missionProgressText(mission, enrollment.progress)} · {enrollment.status === 'COMPLETED' ? `สำเร็จเมื่อ ${shortDate(enrollment.completed_at)}` : `ทำได้ถึง ${shortDate(enrollment.deadline_at)}`}</small>}
           </div>
           {enrollment
             ? <span className={`status-badge ${ENROLLMENT_STATUS[enrollment.status].className}`}>{ENROLLMENT_STATUS[enrollment.status].text}</span>
