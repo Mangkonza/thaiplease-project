@@ -280,3 +280,64 @@ textarea { resize: vertical; }
   .page-wrap { margin: 0; }
   .slip-card { box-shadow: none; border: 0; }
 }
+
+/* หน้า Admin: รายการร้านทุกสถานะ */
+.inline-filter { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.inline-filter select { width: auto; padding: 7px 10px; }
+.admin-shop-info { display: flex; gap: 14px; align-items: flex-start; }
+.admin-shop-info > div:last-child { display: flex; flex-direction: column; gap: 4px; }
+
+/* Dashboard หน้าแรกของ Admin */
+.admin-overview .metric-card strong { font-size: 22px; white-space: nowrap; }
+.dashboard-split { display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; align-items: start; }
+.daily-chart svg { width: 100%; height: auto; display: block; }
+.chart-bar { fill: var(--green); opacity: .78; }
+.chart-bar.active { opacity: 1; }
+.chart-axis { stroke: var(--line); stroke-width: 1; }
+.chart-label { fill: var(--muted); font-size: 15px; }
+.daily-chart g:focus { outline: none; }
+.chart-readout { min-height: 22px; margin-bottom: 8px; font-size: 13px; color: var(--ink); }
+.task-row { width: 100%; border: 0; border-top: 1px solid #edf0ec; background: transparent; text-align: left; font-size: 13px; color: var(--ink); }
+.task-row:hover { color: var(--green); }
+.task-count { min-width: 28px; padding: 3px 8px; border-radius: 99px; background: #eef0f1; text-align: center; font-size: 12px; }
+.task-count.has-items { background: #fff4db; color: #9a7529; }
+.section-gap { margin-top: 22px; }
+@media (max-width: 820px) { .dashboard-split { grid-template-columns: 1fr; } }
+
+/* แม่แบบแคมเปญ */
+.template-row { align-items: flex-start; }
+.template-code { margin-left: 6px; padding: 2px 6px; border-radius: 6px; background: #f1f3f0; color: var(--muted); font-size: 10px; font-weight: 500; }
+.template-edit { width: 100%; }
+.limit-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; align-items: center; font-size: 13px; }
+@media (max-width: 560px) { .limit-row { grid-template-columns: 1fr 1fr; } .limit-row > span { grid-column: 1 / -1; } }
+
+/* งบประมาณโครงการ: แถบสัดส่วนงบที่ใช้ไป */
+.budget-bar { display: flex; height: 14px; margin: 6px 0 10px; overflow: hidden; border-radius: 99px; background: #e9eee9; }
+.budget-bar span { height: 100%; }
+.budget-bar-spent { background: var(--green); }
+.budget-bar-committed { background: #e2b65c; margin-left: 2px; }
+.budget-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; color: var(--muted); font-size: 12px; }
+.budget-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 3px; vertical-align: -1px; }
+.dot-spent { background: var(--green); }
+.dot-committed { background: #e2b65c; }
+.dot-left { background: #e9eee9; border: 1px solid #d5ddd5; }
+.shop-image-preview.large { width: 84px; height: 84px; font-size: 32px; }
+.shop-detail h3 { margin: 18px 0 8px; font-size: 15px; }
+
+/* หน้า Admin: เมนูด้านข้าง */
+.admin-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; align-items: start; }
+.admin-sidebar { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; border: 1px solid var(--line); border-radius: 17px; background: var(--paper); }
+.admin-sidebar .eyebrow { padding: 0 10px 8px; }
+.admin-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; border-radius: 10px; background: transparent; color: #4c5c54; font-size: 14px; text-align: left; }
+.admin-menu-item:hover { background: #f2f6f2; color: var(--green-dark); }
+.admin-menu-item.active { background: var(--mint); color: var(--green-dark); font-weight: 600; }
+.admin-menu-badge { margin-left: auto; min-width: 22px; padding: 2px 7px; border-radius: 99px; background: #fff4db; color: #9a7529; font-size: 11px; text-align: center; }
+.admin-content { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.admin-title { margin: 0; font-size: 26px; color: var(--ink); }
+@media (max-width: 820px) {
+  .admin-layout { grid-template-columns: 1fr; gap: 16px; }
+  .admin-sidebar { position: static; flex-direction: row; overflow-x: auto; padding: 8px; }
+  .admin-sidebar .eyebrow { display: none; }
+  .admin-menu-item { width: auto; flex: none; white-space: nowrap; }
+}
+@media (max-width: 560px) { .admin-overview .metric-grid { grid-template-columns: 1fr; } }

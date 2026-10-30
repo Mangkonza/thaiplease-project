@@ -64,12 +64,12 @@ async function adminCreatePolicy(req, res) {
     const previous = await getActivePolicy(client);
     const result = await client.query(
       `INSERT INTO project_policies AS p (copay_percent, daily_cap, monthly_cap, lifetime_cap, baht_per_coin,
-         coupon_coin_cost, coupon_value, coupon_min_spend, coupon_valid_days, program_start, program_end, note, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         coupon_coin_cost, coupon_value, coupon_min_spend, coupon_valid_days, program_start, program_end, note, created_by, total_budget)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING ${policyColumns('p')}`,
       [input.copay_percent, input.daily_cap, input.monthly_cap, input.lifetime_cap ?? null, input.baht_per_coin,
         input.coupon_coin_cost, input.coupon_value, input.coupon_min_spend, input.coupon_valid_days,
-        input.program_start, input.program_end, note, req.user.user_id]
+        input.program_start, input.program_end, note, req.user.user_id, input.total_budget ?? null]
     );
     const policy = normalizePolicy(result.rows[0]);
     await writeAudit(client, {

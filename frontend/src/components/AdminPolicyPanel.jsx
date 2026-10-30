@@ -12,6 +12,7 @@ const FIELDS = [
   { key: 'coupon_value', label: 'มูลค่าคูปอง (บาท)', step: '0.01' },
   { key: 'coupon_min_spend', label: 'ยอดซื้อขั้นต่ำที่ใช้คูปองได้ (บาท)', step: '0.01' },
   { key: 'coupon_valid_days', label: 'คูปองมีอายุ (วัน)', step: '1' },
+  { key: 'total_budget', label: 'งบประมาณรวมของโครงการ (บาท) เว้นว่าง = ไม่ตั้ง', step: '0.01', optional: true },
 ];
 
 function toForm(policy) {
@@ -63,7 +64,6 @@ export default function AdminPolicyPanel() {
     <div className="content-stack">
       <section className="card">
         <div className="section-heading compact"><h2>แก้นโยบายโครงการ</h2>{current && <span className="muted">ใช้อยู่: เวอร์ชัน {current.policy_version}</span>}</div>
-        <p className="muted">การแก้จะสร้างนโยบายเวอร์ชันใหม่ ใช้กับรายการที่จ่ายหลังบันทึกเท่านั้น รายการเก่ายังอ้างเวอร์ชันเดิม</p>
         {form && <form className="form-grid" onSubmit={submit}>
           {FIELDS.map((field) => <label key={field.key}>{field.label}<input type="number" min="0" step={field.step} required={!field.optional} value={form[field.key]} onChange={(event) => setForm({ ...form, [field.key]: event.target.value })} /></label>)}
           <label>วันเริ่มโครงการ<input type="date" required value={form.program_start} onChange={(event) => setForm({ ...form, program_start: event.target.value })} /></label>

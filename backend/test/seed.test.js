@@ -1,6 +1,6 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildSeedData, renderSql, summarizeShopWeeks, lastCompletedSunday, ID } = require('../scripts/generate-seed');
+const { buildSeedData, renderSql, summarizeShopWeeks, lastCompletedSunday, ID, CATEGORY, AREA, DAILY_CAP, MONTHLY_CAP, PROGRAM_START } = require('../scripts/generate-seed');
 
 const END = '2026-10-18';
 const data = buildSeedData({ endDate: END });
@@ -21,7 +21,29 @@ describe('seed generator', () => {
   });
 
   test('has shops in every status needed by D-10 and AT-20', () => {
-    assert.deepEqual(data.shops.map((s) => s.status).sort(), ['ACTIVE', 'ACTIVE', 'PENDING', 'SUSPENDED']);
+    const count = (status) => data.shops.filter((s) => s.status === status).length;
+    assert.deepEqual([count('ACTIVE'), count('PENDING'), count('SUSPENDED')], [10, 1, 1]);
+  });
+
+  test('every shop uses a category and area offered by the shop search filters', () => {
+    for (const shop of data.shops) {
+      assert.ok(Object.values(CATEGORY).includes(shop.category), `${shop.name}: ${shop.category}`);
+      assert.ok(Object.values(AREA).includes(shop.area), `${shop.name}: ${shop.area}`);
+    }
+  });
+
+  test('every active shop has sales and customers are spread across shops', () => {
+    for (const shop of data.shops.filter((s) => s.status === 'ACTIVE')) {
+      assert.ok(data.payments.some((p) => p.shop_id === shop.shop_id && p.status === 'SUCCESS'), shop.name);
+    }
+    const shopsPerCitizen = new Map();
+    for (const p of data.payments) {
+      if (!shopsPerCitizen.has(p.user_id)) shopsPerCitizen.set(p.user_id, new Set());
+      shopsPerCitizen.get(p.user_id).add(p.shop_id);
+    }
+    const buyers = [...shopsPerCitizen.values()];
+    assert.ok(buyers.length >= 70, `buyers = ${buyers.length}`);
+    assert.ok(buyers.filter((shops) => shops.size >= 2).length >= 40, 'most buyers should use more than one shop');
   });
 
   test('shop A story: new customers drop sharply in the latest week', () => {
@@ -63,5 +85,25 @@ describe('seed generator', () => {
       const day = (p.paid_at || p.created_at).slice(0, 10);
       assert.ok(day >= first && day <= last, p.request_key);
     }
+  });
+
+  test('co-pay from the program start respects the daily and monthly caps', () => {
+    const perDay = new Map();
+    const perMonth = new Map();
+    let subsidised = 0;
+    for (const p of data.payments.filter((x) => x.status === 'SUCCESS')) {
+      const day = p.paid_at.slice(0, 10);
+      assert.equal(p.citizen_paid + p.government_subsidy, p.net_amount, p.request_key);
+      if (day < PROGRAM_START) {
+        assert.equal(p.government_subsidy, 0);
+        continue;
+      }
+      if (p.government_subsidy > 0) subsidised += 1;
+      perDay.set(`${p.user_id}${day}`, (perDay.get(`${p.user_id}${day}`) || 0) + p.government_subsidy);
+      perMonth.set(`${p.user_id}${day.slice(0, 7)}`, (perMonth.get(`${p.user_id}${day.slice(0, 7)}`) || 0) + p.government_subsidy);
+    }
+    assert.ok(subsidised > 50, `subsidised payments = ${subsidised}`);
+    for (const total of perDay.values()) assert.ok(total <= DAILY_CAP + 1e-9);
+    for (const total of perMonth.values()) assert.ok(total <= MONTHLY_CAP + 1e-9);
   });
 });

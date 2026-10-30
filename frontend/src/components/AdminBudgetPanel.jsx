@@ -40,14 +40,28 @@ export default function AdminBudgetPanel() {
   }
 
   if (!budget) return error ? <p className="notice notice-error" role="alert">{error}</p> : <p className="empty-note">กำลังโหลด…</p>;
-  const { payments, coins, coupons, transfers, shops, policy } = budget;
+  const { payments, coins, coupons, transfers, shops, policy, budget: program } = budget;
   return (
-    <div className="content-stack">
+    <div className="content-stack admin-overview">
       {error && <p className="notice notice-error" role="alert">{error}</p>}
+      {program ? <section className="card">
+        <div className="section-heading compact"><h2>งบประมาณโครงการ</h2><span className="muted">ใช้ไปแล้ว {program.used_percent}%</span></div>
+        <div className="budget-bar" role="img" aria-label={`ใช้งบไปแล้ว ${program.used_percent}%`}>
+          <span className="budget-bar-spent" style={{ width: `${Math.min(100, (program.spent / program.total) * 100)}%` }} />
+          <span className="budget-bar-committed" style={{ width: `${Math.min(100, (program.committed / program.total) * 100)}%` }} />
+        </div>
+        <div className="budget-legend"><span><i className="dot-spent" />ใช้ไปแล้ว</span><span><i className="dot-committed" />คูปองที่ออกแล้วยังไม่ใช้</span><span><i className="dot-left" />คงเหลือ</span></div>
+        <div className="metric-grid">
+          <Metric label="งบรวมทั้งโครงการ" value={formatBaht(program.total)} />
+          <Metric label="ใช้ไปแล้ว" value={formatBaht(program.spent)} note="รัฐช่วยจ่าย + คูปองที่ถูกใช้" />
+          <Metric label="งบคงเหลือ" value={formatBaht(program.remaining)} note={`หักคูปองค้างใช้ ${formatBaht(program.committed)} เหลือ ${formatBaht(program.available)}`} />
+          <Metric label="ยอดที่ยังไม่ได้โอนให้ร้าน" value={formatBaht(transfers.pending)} />
+        </div>
+      </section> : <p className="notice">ยังไม่ได้ตั้งงบประมาณรวมของโครงการ</p>}
       <section className="card"><div className="section-heading compact"><h2>งบรัฐช่วยจ่ายและคูปอง</h2>{policy && <span className="muted">นโยบายเวอร์ชัน {policy.policy_version} · รัฐช่วย {policy.copay_percent}%</span>}</div>
         <div className="metric-grid">
           <Metric label="รัฐช่วยจ่ายแล้ว" value={formatBaht(payments.government_subsidy)} note={`ประชาชน ${formatNumber(payments.subsidized_citizens)} คน`} />
-          <Metric label="คูปองที่ถูกใช้" value={formatBaht(payments.coupon_discount)} note="งบแยกจากเพดานรัฐช่วยจ่าย" />
+          <Metric label="คูปองที่ถูกใช้" value={formatBaht(payments.coupon_discount)} />
           <Metric label="ยอดซื้อรวม" value={formatBaht(payments.gross_amount)} note={`${formatNumber(payments.payments)} รายการ · ประชาชนจ่าย ${formatBaht(payments.citizen_paid)}`} />
           <Metric label="คืนเงินแล้ว" value={formatBaht(payments.refunded_amount)} note={`${formatNumber(payments.refunded_payments)} รายการ`} />
         </div>
@@ -64,7 +78,7 @@ export default function AdminBudgetPanel() {
           </div>
         </section>
       </div>
-      <section className="card"><div className="section-heading compact"><div><h2>ยอดโอนให้ร้าน</h2><span className="muted">รัฐช่วยจ่าย + คูปอง ของรายการที่สำเร็จ หักยอดที่บันทึกว่าโอนแล้ว</span></div><span className="muted">รอโอน {formatBaht(transfers.pending)} จาก {formatBaht(transfers.owed)}</span></div>
+      <section className="card"><div className="section-heading compact"><div><h2>ยอดโอนให้ร้าน</h2></div><span className="muted">รอโอน {formatBaht(transfers.pending)} จาก {formatBaht(transfers.owed)}</span></div>
         {shops.length ? <div className="table-wrap"><table><thead><tr><th>ร้าน</th><th>รายการ</th><th>รัฐช่วยจ่าย</th><th>คูปอง</th><th>โอนแล้ว</th><th>รอโอน</th><th></th></tr></thead><tbody>{shops.map((shop) => <tr key={shop.shop_id}>
           <td>{shop.name}</td><td>{formatNumber(shop.payments)}</td><td>{formatBaht(shop.government_subsidy)}</td><td>{formatBaht(shop.coupon_discount)}</td><td>{formatBaht(shop.paid_out)}</td><td><b>{formatBaht(shop.pending)}</b></td>
           <td>{shop.pending > 0 && <button className="button button-outline button-small" disabled={busy} onClick={() => payout(shop)}>บันทึกการโอน</button>}</td>

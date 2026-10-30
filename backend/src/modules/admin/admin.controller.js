@@ -32,31 +32,41 @@ async function updateShopStatus(req, res) {
     return res.status(400).json({ success: false, message: 'Status must be ACTIVE or SUSPENDED' });
   }
   if (status === 'SUSPENDED' && (typeof reason !== 'string' || !reason.trim())) {
-    return res.status(400).json({ success: false, message: 'A reason is required when rejecting a shop' });
+    return res.status(400).json({ success: false, message: 'A reason is required when rejecting or suspending a shop' });
   }
 
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+    const current = await client.query('SELECT status FROM shops WHERE shop_id = $1 FOR UPDATE', [shopId]);
+    if (!current.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Shop not found' });
+    }
+    const previous = current.rows[0].status;
+    if (previous === status) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: `Shop is already ${status}` });
+    }
+    // ร้านที่เจ้าของปิดชั่วคราว (CLOSED) ให้เจ้าของเปิดเอง Admin ระงับได้แต่เปิดแทนไม่ได้
+    if (previous === 'CLOSED' && status === 'ACTIVE') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'This shop was closed by its owner; only the owner can reopen it' });
+    }
     const updated = await client.query(
-      `UPDATE shops SET status = $2, updated_at = NOW()
-       WHERE shop_id = $1 AND status = 'PENDING' RETURNING *`,
+      'UPDATE shops SET status = $2, updated_at = NOW() WHERE shop_id = $1 RETURNING *',
       [shopId, status]
     );
-    if (!updated.rows.length) {
-      const exists = await client.query('SELECT shop_id FROM shops WHERE shop_id = $1', [shopId]);
-      await client.query('ROLLBACK');
-      return res.status(exists.rows.length ? 409 : 404).json({
-        success: false,
-        message: exists.rows.length ? 'Only pending shops can be reviewed' : 'Shop not found',
-      });
-    }
+    // ร้านรออนุมัติ: อนุมัติ/ไม่อนุมัติ, ร้านที่เปิดอยู่: ระงับ, ร้านที่ถูกระงับ: เปิดใช้งานอีกครั้ง
+    const action = previous === 'PENDING'
+      ? (status === 'ACTIVE' ? 'SHOP_APPROVED' : 'SHOP_REJECTED')
+      : (status === 'ACTIVE' ? 'SHOP_REACTIVATED' : 'SHOP_SUSPENDED');
     await writeAudit(client, {
       actorId: req.user.user_id,
-      action: status === 'ACTIVE' ? 'SHOP_APPROVED' : 'SHOP_REJECTED',
+      action,
       entityType: 'shop',
       entityId: shopId,
-      detail: { status, reason: reason ? reason.trim() : null },
+      detail: { status, previous_status: previous, reason: reason ? reason.trim() : null },
     });
     await client.query('COMMIT');
     return res.json({ success: true, shop: updated.rows[0] });

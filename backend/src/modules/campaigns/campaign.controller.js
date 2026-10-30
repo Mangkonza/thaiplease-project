@@ -3,7 +3,6 @@ const db = require('../../config/db');
 const { writeAudit } = require('../shared/audit');
 const { validateCampaignParameters } = require('./campaign.service');
 const { evaluateCampaign } = require('./campaign.metrics');
-const { COIN_TEMPLATES } = require('../budget/budget.service');
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -118,7 +117,7 @@ async function createCampaign(req, res) {
     let source;
     if (suggestionId) {
       const selected = await client.query(
-        `SELECT a.*, t.parameter_schema, r.shop_id
+        `SELECT a.*, t.parameter_schema, t.active AS template_active, t.archived_at AS template_archived_at, r.shop_id
          FROM ai_suggestions a
          JOIN ai_reports r ON r.report_id = a.report_id
          JOIN promotion_templates t ON t.template_id = a.template_id
@@ -129,6 +128,9 @@ async function createCampaign(req, res) {
       source = selected.rows[0];
       if (source.shop_id !== shopId) throw Object.assign(new Error('Suggestion belongs to another shop'), { status: 403 });
       if (source.status !== 'SELECTED') throw Object.assign(new Error('Select the AI suggestion before creating a campaign'), { status: 409 });
+      if (!source.template_active || source.template_archived_at) {
+        throw Object.assign(new Error('This promotion template has been turned off by the administrator'), { status: 409 });
+      }
       const existingCampaign = await client.query(
         'SELECT campaign_id FROM campaigns WHERE suggestion_id = $1',
         [suggestionId]
@@ -199,8 +201,7 @@ async function updateCampaign(req, res) {
     const updated = await client.query(
       `UPDATE campaigns
        SET name = $2, parameters = $3, start_at = $4, end_at = $5,
-           treatment_ratio = $6, updated_at = NOW(),
-           coin_approval_status = NULL, coin_approval_note = NULL, coin_approved_by = NULL, coin_approved_at = NULL
+           treatment_ratio = $6, updated_at = NOW()
        WHERE campaign_id = $1 AND status = 'DRAFT'
        RETURNING *`,
       [req.params.campaignId, nextName, JSON.stringify(nextParameters), nextStart, nextEnd, nextRatio]
@@ -249,11 +250,6 @@ async function activateCampaign(req, res) {
     if (current.rows[0].status !== 'DRAFT') {
       await client.query('ROLLBACK');
       return res.status(409).json({ success: false, message: 'Only draft campaigns can be activated' });
-    }
-    const template = await client.query('SELECT code FROM promotion_templates WHERE template_id = $1', [current.rows[0].template_id]);
-    if (COIN_TEMPLATES.includes(template.rows[0]?.code) && current.rows[0].coin_approval_status !== 'APPROVED') {
-      await client.query('ROLLBACK');
-      return res.status(409).json({ success: false, message: 'Coin campaigns need admin approval before activation' });
     }
     const active = await client.query(
       `SELECT campaign_id FROM campaigns
@@ -333,7 +329,7 @@ async function evaluate(req, res) {
   try {
     await client.query('BEGIN');
     const result = await client.query(
-      `SELECT c.*, t.code AS template_code
+      `SELECT c.*, t.mechanic AS template_code
        FROM campaigns c JOIN promotion_templates t ON t.template_id = c.template_id
        WHERE c.campaign_id = $1`,
       [req.params.campaignId]
@@ -413,7 +409,7 @@ async function evaluate(req, res) {
 async function getCampaign(req, res) {
   try {
     const result = await db.query(
-      `SELECT c.*, t.code AS template_code, t.name AS template_name,
+      `SELECT c.*, t.mechanic AS template_code, t.name AS template_name,
               r.result_status, r.uplift, r.explanation
        FROM campaigns c
        JOIN promotion_templates t ON t.template_id = c.template_id
@@ -447,7 +443,7 @@ async function getCampaignResult(req, res) {
 async function getShopCampaigns(req, res) {
   try {
     const result = await db.query(
-      `SELECT c.*, t.name AS template_name, t.code AS template_code, r.result_status, r.uplift
+      `SELECT c.*, t.name AS template_name, t.mechanic AS template_code, r.result_status, r.uplift
        FROM campaigns c JOIN promotion_templates t ON t.template_id = c.template_id
        LEFT JOIN campaign_results r ON r.campaign_id = c.campaign_id
        WHERE c.shop_id = $1 ORDER BY c.created_at DESC`,

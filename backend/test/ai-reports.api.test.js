@@ -37,7 +37,7 @@ function mockDatabase({ owner = OWNER_ID, current = metricsRow(12, 1), previous 
     if (sql.includes('WITH bounds')) return { rows: [params[1] === '2026-10-12' ? current : previous] };
     if (sql.includes('INSERT INTO shop_metrics')) return { rows: [{ metric_id: 'm', created_at: '2026-10-22T10:00:00Z' }] };
     if (sql.includes('FROM promotion_templates WHERE active')) return { rows: templates };
-    if (sql.includes('FROM promotion_templates ORDER BY')) return { rows: templates.map((t) => ({ ...t, active: true })) };
+    if (sql.includes('FROM promotion_templates WHERE archived_at IS NULL ORDER BY')) return { rows: templates.map((t) => ({ ...t, active: true })) };
     if (sql.includes('FROM ai_reports r JOIN shops')) return { rows: state.report && params[0] === REPORT_ID ? [{ ...state.report, owner_id: owner }] : [] };
     if (sql.includes('FROM ai_reports') && sql.includes('LIMIT 20')) {
       state.listParams = params;

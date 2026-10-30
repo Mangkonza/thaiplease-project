@@ -34,7 +34,7 @@ async function priceCheckout(client, { shopId, userId, grossAmount, couponId, pa
   const campaignDiscount = benefit ? benefit.discountAmount : 0;
   let coupon = null;
   if (couponId) {
-    const locked = await lockCouponForCheckout(client, { couponId, userId, shopReceives: grossAmount - campaignDiscount, paidAt });
+    const locked = await lockCouponForCheckout(client, { couponId, userId, shopId, shopReceives: grossAmount - campaignDiscount, paidAt });
     if (locked.error) return locked;
     coupon = locked.coupon;
   }

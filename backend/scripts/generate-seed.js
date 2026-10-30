@@ -16,6 +16,12 @@ const SHOP_A_REPEAT_PROBABILITY = [0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.3
 const SHOP_B_NEW_PER_WEEK = [3, 3, 3, 3, 3, 3, 3, 3];
 const SHOP_B_REPEAT_PROBABILITY = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
 const BAHT_PER_COIN = 25; // BR-09
+// รัฐช่วยจ่ายย้อนหลังให้รายการตั้งแต่เริ่มโครงการ ตามเพดานโครงการจริง (ดู docker/postgres/09_monthly_cap_only.sql)
+const PROGRAM_START = '2026-10-01';
+const COPAY_PERCENT = 60;
+const DAILY_CAP = 200;
+const MONTHLY_CAP = 1000;
+const SEED_POLICY_VERSION = 1;
 
 const uuid = (prefix, n) => `${prefix}0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
@@ -29,7 +35,32 @@ const ID = {
   shopB: uuid('b', 2),
   shopPending: uuid('b', 3),
   shopSuspended: uuid('b', 4),
+  // ร้านเพิ่มเติม 8 ร้าน (merchant.c ถึง merchant.j)
+  extraMerchant: (i) => uuid('a', 10 + i),
+  extraShop: (i) => uuid('b', 4 + i),
 };
+
+// หมวดหมู่และพื้นที่ต้องตรงกับตัวเลือกในหน้าค้นหาร้าน (frontend ShopsPage / MerchantShopsPage)
+const CATEGORY = {
+  drinks: 'อาหารและเครื่องดื่ม',
+  cafe: 'คาเฟ่',
+  madeToOrder: 'ร้านอาหารตามสั่ง',
+  dessert: 'ของหวานและเบเกอรี่',
+  goods: 'ของใช้และบริการ',
+};
+const AREA = { kps: 'กำแพงแสน', city: 'เมืองนครปฐม', bangkhen: 'บางเขน', campus: 'มหาวิทยาลัย' };
+
+// ร้านเพิ่มเติม: ลูกค้าสุ่มจากประชาชนทั้ง 80 คน แต่ละร้านมีแนวโน้มยอดขายต่างกัน
+const EXTRA_SHOPS = [
+  { owner: 'ลุงหมาย', name: 'ก๋วยเตี๋ยวเรือลุงหมาย', category: CATEGORY.madeToOrder, area: AREA.kps, description: 'ก๋วยเตี๋ยวเรือน้ำตกหมูเนื้อ ชามเล็กชามใหญ่ เปิดทุกวัน', newPerWeek: [3, 3, 3, 3, 3, 3, 3, 3], repeat: 0.5, min: 40, max: 90 },
+  { owner: 'น้องฟ้า', name: 'ชานมไข่มุกน้องฟ้า', category: CATEGORY.drinks, area: AREA.campus, description: 'ชานมไข่มุก ชาผลไม้ และโกโก้เย็น หน้ามหาวิทยาลัย', newPerWeek: [1, 2, 2, 3, 3, 4, 4, 5], repeat: 0.45, min: 35, max: 80 },
+  { owner: 'ยายเพ็ญ', name: 'ส้มตำยายเพ็ญ', category: CATEGORY.madeToOrder, area: AREA.kps, description: 'ส้มตำ ไก่ย่าง ลาบ น้ำตก รสจัดจ้านแบบอีสาน', newPerWeek: [3, 3, 2, 3, 2, 3, 2, 3], repeat: 0.4, min: 50, max: 150 },
+  { owner: 'คุณนิด', name: 'เบเกอรี่บ้านขนมปัง', category: CATEGORY.dessert, area: AREA.city, description: 'ขนมปังอบใหม่ เค้กชิ้น และคุกกี้เนยสด', newPerWeek: [3, 3, 3, 2, 2, 2, 1, 1], repeat: 0.35, min: 60, max: 220 },
+  { owner: 'แม่ทองใบ', name: 'ข้าวแกงแม่ทองใบ', category: CATEGORY.madeToOrder, area: AREA.campus, description: 'ข้าวราดแกงกว่า 20 อย่าง ราคานักศึกษา', newPerWeek: [4, 3, 4, 3, 4, 3, 4, 3], repeat: 0.55, min: 40, max: 100 },
+  { owner: 'คุณต้น', name: 'คาเฟ่ริมนา', category: CATEGORY.cafe, area: AREA.kps, description: 'กาแฟดริปและเครื่องดื่มเย็น วิวทุ่งนา นั่งชิลได้ทั้งวัน', newPerWeek: [2, 2, 3, 3, 2, 3, 3, 2], repeat: 0.3, min: 70, max: 260 },
+  { owner: 'ป้าสมใจ', name: 'ร้านชำป้าสมใจ', category: CATEGORY.goods, area: AREA.bangkhen, description: 'ของใช้ในบ้าน เครื่องปรุง ขนม และน้ำดื่ม', newPerWeek: [2, 2, 2, 2, 2, 2, 2, 2], repeat: 0.5, min: 30, max: 300 },
+  { owner: 'พี่บอล', name: 'น้ำปั่นผลไม้สดหน้ามอ', category: CATEGORY.drinks, area: AREA.campus, description: 'น้ำปั่นผลไม้สด สมูทตี้ และน้ำผลไม้คั้นสด', newPerWeek: [2, 2, 3, 2, 3, 2, 3, 2], repeat: 0.4, min: 30, max: 70 },
+];
 
 // PRNG แบบ mulberry32 เพื่อให้สุ่มซ้ำได้เหมือนเดิม
 function createRandom(seed) {
@@ -87,6 +118,9 @@ function buildSeedData({ endDate }) {
     { user_id: ID.merchantB, email: 'merchant.b@thaiplease.test', display_name: 'ป้าแดง', role: 'MERCHANT', status: 'ACTIVE' },
     { user_id: ID.suspendedCitizen, email: 'suspended@thaiplease.test', display_name: 'Suspended Citizen', role: 'CITIZEN', status: 'SUSPENDED' },
   ];
+  EXTRA_SHOPS.forEach((shop, index) => {
+    users.push({ user_id: ID.extraMerchant(index + 1), email: `merchant.${String.fromCharCode(99 + index)}@thaiplease.test`, display_name: shop.owner, role: 'MERCHANT', status: 'ACTIVE' });
+  });
   for (let i = 1; i <= 80; i++) {
     users.push({
       user_id: ID.citizen(i),
@@ -101,13 +135,17 @@ function buildSeedData({ endDate }) {
   // คำอธิบายร้านแสดงบนหน้าเว็บ จึงเขียนแบบร้านจริง ไม่เฉลย story ของข้อมูลก่อน AI วิเคราะห์
   const shops = [
     // ร้าน story: ลูกค้าใหม่ลดลงในสัปดาห์ล่าสุด
-    { shop_id: ID.shopA, owner_id: ID.merchantA, name: 'ร้านกาแฟบ้านสวน', category: 'คาเฟ่', area: 'กำแพงแสน', description: 'กาแฟสดคั่วเองและขนมโฮมเมด บรรยากาศสวน ใกล้มหาวิทยาลัย', status: 'ACTIVE' },
+    { shop_id: ID.shopA, owner_id: ID.merchantA, name: 'ร้านกาแฟบ้านสวน', category: CATEGORY.cafe, area: AREA.kps, description: 'กาแฟสดคั่วเองและขนมโฮมเมด บรรยากาศสวน ใกล้มหาวิทยาลัย', status: 'ACTIVE' },
     // ร้านเปรียบเทียบ: ยอดขายคงที่
-    { shop_id: ID.shopB, owner_id: ID.merchantB, name: 'ข้าวมันไก่ป้าแดง', category: 'ร้านอาหาร', area: 'กำแพงแสน', description: 'ข้าวมันไก่ต้มและไก่ทอดสูตรดั้งเดิม เปิดเช้าถึงบ่าย', status: 'ACTIVE' },
+    { shop_id: ID.shopB, owner_id: ID.merchantB, name: 'ข้าวมันไก่ป้าแดง', category: CATEGORY.madeToOrder, area: AREA.kps, description: 'ข้าวมันไก่ต้มและไก่ทอดสูตรดั้งเดิม เปิดเช้าถึงบ่าย', status: 'ACTIVE' },
     // รอ Admin อนุมัติ (D-10)
-    { shop_id: ID.shopPending, owner_id: ID.merchantB, name: 'ขนมไทยแม่ศรี', category: 'ขนม', area: 'นครปฐม', description: 'ขนมไทยทำสดทุกวัน รับสั่งทำงานบุญ', status: 'PENDING' },
+    { shop_id: ID.shopPending, owner_id: ID.merchantB, name: 'ขนมไทยแม่ศรี', category: CATEGORY.dessert, area: AREA.city, description: 'ขนมไทยทำสดทุกวัน รับสั่งทำงานบุญ', status: 'PENDING' },
     // ถูกระงับ: ประชาชนต้องค้นหาไม่เจอ (AT-20)
-    { shop_id: ID.shopSuspended, owner_id: ID.merchantA, name: 'บ้านสวนเบเกอรี่', category: 'เบเกอรี่', area: 'นครปฐม', description: 'ขนมปังและเค้กอบสดใหม่ทุกเช้า', status: 'SUSPENDED' },
+    { shop_id: ID.shopSuspended, owner_id: ID.merchantA, name: 'บ้านสวนเบเกอรี่', category: CATEGORY.dessert, area: AREA.city, description: 'ขนมปังและเค้กอบสดใหม่ทุกเช้า', status: 'SUSPENDED' },
+    ...EXTRA_SHOPS.map((shop, index) => ({
+      shop_id: ID.extraShop(index + 1), owner_id: ID.extraMerchant(index + 1), name: shop.name, category: shop.category,
+      area: shop.area, description: shop.description, status: 'ACTIVE',
+    })),
   ];
 
   const payments = [];
@@ -116,7 +154,8 @@ function buildSeedData({ endDate }) {
     return `${isoDate(day)} ${pad2(pick(8, 19))}:${pad2(pick(0, 59))}:00+07`;
   };
 
-  const generateShopPayments = ({ shopId, key, citizenOffset, newPerWeek, repeatProbability, minAmount, maxAmount }) => {
+  // nextNewCitizen: เลือกลูกค้าใหม่คนถัดไปของร้าน (ร้าน A/B ใช้ลำดับต่อกัน ร้านเพิ่มเติมสุ่มจากทั้ง 80 คน)
+  const generateShopPayments = ({ shopId, key, citizenOffset, newPerWeek, repeatProbability, minAmount, maxAmount, nextNewCitizen }) => {
     const customers = []; // citizen index ที่เคยซื้อแล้ว
     let nextCitizen = citizenOffset;
     for (const week of weeks) {
@@ -125,7 +164,8 @@ function buildSeedData({ endDate }) {
         if (random() < repeatProbability[week.number - 1]) orders.push(citizen);
       }
       for (let n = 0; n < newPerWeek[week.number - 1]; n++) {
-        nextCitizen += 1;
+        nextCitizen = nextNewCitizen ? nextNewCitizen(customers) : nextCitizen + 1;
+        if (nextCitizen === null) break;
         customers.push(nextCitizen);
         orders.push(nextCitizen);
       }
@@ -171,7 +211,21 @@ function buildSeedData({ endDate }) {
     created_at: failedAt,
   });
 
+  // ร้านเพิ่มเติมสร้างหลังร้าน A/B เพื่อให้ข้อมูลร้าน A ที่ใช้ demo AI ไม่เปลี่ยน
+  const randomNewCitizen = (customers) => {
+    const candidates = [];
+    for (let i = 1; i <= 80; i++) if (!customers.includes(i)) candidates.push(i);
+    return candidates.length ? candidates[Math.floor(random() * candidates.length)] : null;
+  };
+  EXTRA_SHOPS.forEach((shop, index) => {
+    generateShopPayments({
+      shopId: ID.extraShop(index + 1), key: `x${index + 1}`, citizenOffset: 0, newPerWeek: shop.newPerWeek,
+      repeatProbability: Array(WEEKS).fill(shop.repeat), minAmount: shop.min, maxAmount: shop.max, nextNewCitizen: randomNewCitizen,
+    });
+  });
+
   payments.forEach((payment, i) => { payment.payment_id = uuid('c', i + 1); });
+  applySubsidy(payments);
 
   const coinLedger = [];
   for (const payment of payments) {
@@ -187,6 +241,34 @@ function buildSeedData({ endDate }) {
   coinLedger.forEach((entry, i) => { entry.ledger_id = uuid('d', i + 1); });
 
   return { endDate, weeks: weeks.map(({ number, start, end: weekEnd }) => ({ number, start, end: weekEnd })), users, shops, payments, coinLedger };
+}
+
+// คิดรัฐช่วยจ่ายตามลำดับเวลาของแต่ละคน รายการคืนเงินไม่นับเข้าเพดาน (เหมือน policy.service getSubsidyUsage)
+function applySubsidy(payments) {
+  const used = new Map();
+  // รายการที่ไม่สำเร็จ (ไม่มี paid_at) ต้องมีค่า 0 ด้วย เพราะคอลัมน์เป็น NOT NULL
+  payments.forEach((payment) => { payment.government_subsidy = 0; payment.policy_version = null; });
+  const ordered = payments.filter((p) => p.paid_at).sort((x, y) => x.paid_at.localeCompare(y.paid_at));
+  for (const payment of ordered) {
+    payment.government_subsidy = 0;
+    payment.policy_version = null;
+    const day = payment.paid_at.slice(0, 10);
+    if (day < PROGRAM_START) continue;
+    const month = day.slice(0, 7);
+    const usage = used.get(payment.user_id) || { day: '', today: 0, month: '', thisMonth: 0 };
+    if (usage.day !== day) { usage.day = day; usage.today = 0; }
+    if (usage.month !== month) { usage.month = month; usage.thisMonth = 0; }
+    const wanted = Math.round(payment.net_amount * COPAY_PERCENT) / 100;
+    const subsidy = Math.max(0, Math.min(wanted, DAILY_CAP - usage.today, MONTHLY_CAP - usage.thisMonth));
+    payment.government_subsidy = subsidy;
+    payment.citizen_paid = payment.net_amount - subsidy;
+    payment.policy_version = SEED_POLICY_VERSION;
+    if (payment.status === 'SUCCESS') {
+      usage.today += subsidy;
+      usage.thisMonth += subsidy;
+    }
+    used.set(payment.user_id, usage);
+  }
 }
 
 // สรุป story รายสัปดาห์ของร้าน: ใช้ทั้งพิมพ์ตอน generate และใน test
@@ -227,7 +309,7 @@ function renderSql(data) {
     '',
     insertSql('users', ['user_id', 'email', 'password_hash', 'display_name', 'role', 'status'], data.users),
     insertSql('shops', ['shop_id', 'owner_id', 'name', 'category', 'area', 'description', 'status'], data.shops),
-    insertSql('payments', ['payment_id', 'request_key', 'user_id', 'shop_id', 'gross_amount', 'discount_amount', 'net_amount', 'citizen_paid', 'status', 'paid_at', 'created_at'], data.payments),
+    insertSql('payments', ['payment_id', 'request_key', 'user_id', 'shop_id', 'gross_amount', 'discount_amount', 'net_amount', 'government_subsidy', 'citizen_paid', 'policy_version', 'status', 'paid_at', 'created_at'], data.payments),
     insertSql('coin_ledger', ['ledger_id', 'user_id', 'payment_id', 'amount', 'reason', 'created_at'], data.coinLedger),
     'COMMIT;',
     '',
@@ -258,4 +340,4 @@ if (require.main === module) {
   console.table(summarizeShopWeeks(data, ID.shopA));
 }
 
-module.exports = { buildSeedData, renderSql, summarizeShopWeeks, lastCompletedSunday, ID, SEED_PASSWORD };
+module.exports = { buildSeedData, renderSql, summarizeShopWeeks, lastCompletedSunday, ID, SEED_PASSWORD, CATEGORY, AREA, DAILY_CAP, MONTHLY_CAP, PROGRAM_START };
