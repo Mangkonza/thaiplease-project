@@ -14,6 +14,7 @@ const adminRoutes = require('./modules/admin/admin.routes');
 const campaignRoutes = require('./modules/campaigns/campaign.routes');
 const policyRoutes = require('./modules/policies/policy.routes');
 const caseRoutes = require('./modules/cases/case.routes');
+const paymentRequestRoutes = require('./modules/payment-requests/payment-request.routes');
 const { UPLOAD_DIR } = require('./modules/shops/shop-image');
 
 const app = express();
@@ -38,6 +39,7 @@ app.get('/health', async (req, res) => {
 
 // ผูก Module Routes ตาม Prefix ใน SRS (/api/v1)
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1', paymentRequestRoutes);
 app.use('/api/v1/shops', shopRoutes);
 app.use('/api/v1/shops', analyticsRoutes);
 app.use('/api/v1', aiReportRoutes);
