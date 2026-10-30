@@ -58,7 +58,7 @@ async function adminDashboard(req, res) {
       ),
     ]);
 
-    const shopCounts = { ACTIVE: 0, PENDING: 0, SUSPENDED: 0 };
+    const shopCounts = { ACTIVE: 0, PENDING: 0, SUSPENDED: 0, CLOSED: 0 };
     for (const row of shops.rows) shopCounts[row.status] = row.count;
     const money = toNumber(totals.rows[0]);
     const { owed, paid_out: paidOut } = toNumber(payouts.rows[0]);

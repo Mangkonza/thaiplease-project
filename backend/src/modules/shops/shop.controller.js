@@ -84,7 +84,17 @@ const getMyShops = async (req, res) => {
 
   try {
     const result = await db.query(
-      'SELECT * FROM shops WHERE owner_id = $1 ORDER BY created_at DESC',
+      `SELECT s.*,
+              (SELECT al.detail ->> 'reason'
+               FROM audit_logs al
+               WHERE al.entity_type = 'shop'
+                 AND al.entity_id = s.shop_id
+                 AND al.action = 'SHOP_REJECTED'
+               ORDER BY al.created_at DESC
+               LIMIT 1) AS rejection_reason
+       FROM shops s
+       WHERE s.owner_id = $1
+       ORDER BY s.created_at DESC`,
       [owner_id]
     );
 
@@ -94,6 +104,133 @@ const getMyShops = async (req, res) => {
     });
   } catch (error) {
     console.error('Get my shops error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+const deleteUnavailableShop = async (req, res) => {
+  const { shopId } = req.params;
+  const ownerId = req.user.user_id;
+
+  try {
+    const result = await db.query(
+      `DELETE FROM shops
+       WHERE shop_id = $1 AND owner_id = $2 AND status IN ('PENDING', 'SUSPENDED', 'CLOSED')
+       RETURNING shop_id`,
+      [shopId, ownerId]
+    );
+
+    if (result.rows.length) {
+      return res.json({ success: true, message: 'Shop deleted' });
+    }
+
+    const existing = await db.query(
+      'SELECT status FROM shops WHERE shop_id = $1 AND owner_id = $2',
+      [shopId, ownerId]
+    );
+    if (!existing.rows.length) {
+      return res.status(404).json({ success: false, message: 'Shop not found' });
+    }
+    return res.status(409).json({
+      success: false,
+      message: 'Only pending, rejected, or closed shops can be deleted',
+    });
+  } catch (error) {
+    if (error.code === '23503') {
+      return res.status(409).json({
+        success: false,
+        message: 'ลบร้านไม่ได้ เนื่องจากมีข้อมูลธุรกรรมที่อ้างอิงร้านนี้อยู่',
+      });
+    }
+    console.error('Delete rejected shop error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+const resubmitRejectedShop = async (req, res) => {
+  const { shopId } = req.params;
+  const { name, category, area, description } = req.body;
+
+  if (typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ success: false, message: 'Shop name is required' });
+  }
+  if (name.trim().length > 150) {
+    return res.status(400).json({ success: false, message: 'Shop name must be 150 characters or fewer' });
+  }
+
+  try {
+    const result = await db.query(
+      `UPDATE shops
+       SET name = $3, category = $4, area = $5, description = $6,
+           status = 'PENDING', updated_at = NOW()
+       WHERE shop_id = $1 AND owner_id = $2 AND status = 'SUSPENDED'
+       RETURNING *`,
+      [shopId, req.user.user_id, name.trim(), category || null, area || null, description || null]
+    );
+    if (!result.rows.length) {
+      const existing = await db.query(
+        'SELECT status FROM shops WHERE shop_id = $1 AND owner_id = $2',
+        [shopId, req.user.user_id]
+      );
+      if (!existing.rows.length) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
+      }
+      return res.status(409).json({ success: false, message: 'Only rejected shops can be resubmitted' });
+    }
+    return res.json({
+      success: true,
+      message: 'Shop updated and resubmitted for admin approval',
+      shop: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Resubmit rejected shop error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+const updateMerchantShopStatus = async (req, res) => {
+  const { shopId } = req.params;
+  const { status } = req.body;
+  if (!['ACTIVE', 'CLOSED'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Status must be ACTIVE or CLOSED' });
+  }
+
+  const expectedStatus = status === 'CLOSED' ? 'ACTIVE' : 'CLOSED';
+  try {
+    const result = await db.query(
+      `UPDATE shops SET status = $3, updated_at = NOW()
+       WHERE shop_id = $1 AND owner_id = $2 AND status = $4
+       RETURNING *`,
+      [shopId, req.user.user_id, status, expectedStatus]
+    );
+    if (!result.rows.length) {
+      const existing = await db.query(
+        'SELECT status FROM shops WHERE shop_id = $1 AND owner_id = $2',
+        [shopId, req.user.user_id]
+      );
+      if (!existing.rows.length) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
+      }
+      return res.status(409).json({
+        success: false,
+        message: status === 'CLOSED'
+          ? 'Only active shops can be closed'
+          : 'Only closed shops can be reopened',
+      });
+    }
+    return res.json({
+      success: true,
+      message: status === 'CLOSED' ? 'Shop closed' : 'Shop reopened',
+      shop: result.rows[0],
+    });
+  } catch (error) {
+    if (error.code === '22P02') {
+      return res.status(409).json({
+        success: false,
+        message: 'ฐานข้อมูลยังไม่ได้อัปเดตสำหรับการปิดร้าน กรุณารัน migration 10_shop_closure.sql แล้วลองอีกครั้ง',
+      });
+    }
+    console.error('Update merchant shop status error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
@@ -158,5 +295,8 @@ module.exports = {
   createShop,
   getShopById,
   getMyShops,
+  deleteUnavailableShop,
+  resubmitRejectedShop,
+  updateMerchantShopStatus,
   getAllShops,
 };

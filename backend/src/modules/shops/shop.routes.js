@@ -17,6 +17,13 @@ router.post('/', authenticateToken, authorizeRole('MERCHANT', 'ADMIN'), shopCont
 // Public storefront details for active shops.
 router.get('/public/:shopId', shopController.getPublicShopById);
 
+// Merchants can remove shops that were not approved.
+router.delete('/:shopId', authenticateToken, authorizeRole('MERCHANT'), verifyShopOwner, shopController.deleteUnavailableShop);
+
+// Merchants can edit rejected shops and resubmit them for review.
+router.put('/:shopId', authenticateToken, authorizeRole('MERCHANT'), verifyShopOwner, shopController.resubmitRejectedShop);
+router.patch('/:shopId/status', authenticateToken, authorizeRole('MERCHANT'), verifyShopOwner, shopController.updateMerchantShopStatus);
+
 // Protected route: อ่านข้อมูลร้านค้าตาม shopId (ตรวจสอบสิทธิ์เจ้าของร้านตาม BR-04)
 router.get('/:shopId', authenticateToken, verifyShopOwner, shopController.getShopById);
 

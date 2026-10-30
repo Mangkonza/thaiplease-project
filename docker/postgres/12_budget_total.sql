@@ -1,4 +1,4 @@
--- 1) เลิกใช้การอนุมัติแคมเปญแจกเหรียญทีละแคมเปญ Admin คุมผ่านแม่แบบแคมเปญแทน (10_templates_missions.sql)
+-- 1) เลิกใช้การอนุมัติแคมเปญแจกเหรียญทีละแคมเปญ Admin คุมผ่านแม่แบบแคมเปญแทน (11_templates_missions.sql)
 ALTER TABLE campaigns DROP COLUMN IF EXISTS coin_approval_status;
 ALTER TABLE campaigns DROP COLUMN IF EXISTS coin_approval_note;
 ALTER TABLE campaigns DROP COLUMN IF EXISTS coin_approved_by;

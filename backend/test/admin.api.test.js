@@ -74,6 +74,18 @@ describe('admin shop approval', () => {
     assert.ok(statements.find(({ sql }) => sql.includes('INSERT INTO audit_logs')).params.includes('SHOP_REACTIVATED'));
   });
 
+  test('an owner-closed shop cannot be reopened by an admin but can be suspended', async () => {
+    let statements = mockShopStatus('CLOSED');
+    const reopen = await api.request('PATCH', `/api/v1/admin/shops/${SHOP_ID}/status`, { token, body: { status: 'ACTIVE' } });
+    assert.equal(reopen.status, 409);
+    assert.ok(!statements.some(({ sql }) => sql.includes('UPDATE shops')));
+
+    mock.restoreAll();
+    statements = mockShopStatus('CLOSED');
+    const suspend = await api.request('PATCH', `/api/v1/admin/shops/${SHOP_ID}/status`, { token, body: { status: 'SUSPENDED', reason: 'ร้องเรียน' } });
+    assert.equal(suspend.status, 200);
+  });
+
   test('refuses a change to the same status and an unknown shop', async () => {
     let statements = mockShopStatus('ACTIVE');
     const same = await api.request('PATCH', `/api/v1/admin/shops/${SHOP_ID}/status`, { token, body: { status: 'ACTIVE' } });

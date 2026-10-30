@@ -1,5 +1,5 @@
 -- แม่แบบแคมเปญที่ Admin จัดการเองได้ และภารกิจหลายแบบที่ให้เหรียญหรือคูปองเฉพาะร้าน
--- รันซ้ำได้: docker exec -i thaiplease_postgres psql -U thaiplease_user -d thaiplease_db < docker/postgres/10_templates_missions.sql
+-- รันซ้ำได้: docker exec -i thaiplease_postgres psql -U thaiplease_user -d thaiplease_db < docker/postgres/11_templates_missions.sql
 
 -- 1) แม่แบบ = กลไก (วิธีคิดส่วนลดในโค้ด มี 10 แบบ) + ชื่อ คำอธิบาย และช่วงค่าที่ Admin ตั้งเอง
 ALTER TABLE promotion_templates ADD COLUMN IF NOT EXISTS mechanic VARCHAR(50);

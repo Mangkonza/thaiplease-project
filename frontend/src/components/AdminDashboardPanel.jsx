@@ -84,6 +84,7 @@ export default function AdminDashboardPanel({ onOpen }) {
           <dl className="receipt-list">
             <div><dt>ร้านเปิดใช้งาน</dt><dd>{data.shops.ACTIVE} ร้าน</dd></div>
             <div><dt>ร้านรออนุมัติ / ระงับ</dt><dd>{data.shops.PENDING} / {data.shops.SUSPENDED} ร้าน</dd></div>
+            <div><dt>ร้านปิดชั่วคราว</dt><dd>{data.shops.CLOSED ?? 0} ร้าน</dd></div>
             <div><dt>ประชาชนที่ใช้งานได้</dt><dd>{data.citizens.active} คน</dd></div>
           </dl>
         </section>

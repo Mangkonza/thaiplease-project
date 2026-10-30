@@ -4,7 +4,7 @@ const { UUID_PATTERN } = require('../../middlewares/shop.middleware');
 
 async function listShops(req, res) {
   const status = req.query.status;
-  if (status && !['PENDING', 'ACTIVE', 'SUSPENDED'].includes(status)) {
+  if (status && !['PENDING', 'ACTIVE', 'SUSPENDED', 'CLOSED'].includes(status)) {
     return res.status(400).json({ success: false, message: 'Invalid shop status filter' });
   }
   try {
@@ -47,6 +47,11 @@ async function updateShopStatus(req, res) {
     if (previous === status) {
       await client.query('ROLLBACK');
       return res.status(409).json({ success: false, message: `Shop is already ${status}` });
+    }
+    // ร้านที่เจ้าของปิดชั่วคราว (CLOSED) ให้เจ้าของเปิดเอง Admin ระงับได้แต่เปิดแทนไม่ได้
+    if (previous === 'CLOSED' && status === 'ACTIVE') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'This shop was closed by its owner; only the owner can reopen it' });
     }
     const updated = await client.query(
       'UPDATE shops SET status = $2, updated_at = NOW() WHERE shop_id = $1 RETURNING *',

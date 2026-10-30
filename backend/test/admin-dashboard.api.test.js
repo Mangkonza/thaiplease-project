@@ -28,7 +28,7 @@ test('admin dashboard combines counts, money, pending work and the daily trend',
   const response = await api.request('GET', '/api/v1/admin/dashboard', { token: adminToken });
   assert.equal(response.status, 200);
   const { dashboard } = response.body;
-  assert.deepEqual(dashboard.shops, { ACTIVE: 10, PENDING: 1, SUSPENDED: 0 });
+  assert.deepEqual(dashboard.shops, { ACTIVE: 10, PENDING: 1, SUSPENDED: 0, CLOSED: 0 });
   assert.deepEqual(dashboard.month, { orders: 372, gross: 37545, subsidy: 22405, buyers: 79 });
   assert.deepEqual(dashboard.payouts, { owed: 22405, paid_out: 610, outstanding: 21795 });
   assert.deepEqual(dashboard.pending, { shops: 1, cases: 2 });
