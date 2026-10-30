@@ -4,7 +4,7 @@ const { UUID_PATTERN } = require('../../middlewares/shop.middleware');
 
 async function listShops(req, res) {
   const status = req.query.status;
-  if (status && !['PENDING', 'ACTIVE', 'SUSPENDED'].includes(status)) {
+  if (status && !['PENDING', 'ACTIVE', 'SUSPENDED', 'CLOSED'].includes(status)) {
     return res.status(400).json({ success: false, message: 'Invalid shop status filter' });
   }
   try {

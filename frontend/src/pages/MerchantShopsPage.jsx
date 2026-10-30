@@ -33,6 +33,10 @@ export default function MerchantShopsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [deletingShopId, setDeletingShopId] = useState('');
+  const [updatingShopId, setUpdatingShopId] = useState('');
+  const [editingShopId, setEditingShopId] = useState('');
+  const [confirmation, setConfirmation] = useState(null);
   const navigate = useNavigate();
   // มาจากเมนูในหน้าร้าน (state.stay) = ตั้งใจมาดูรายการร้านหรือเพิ่มร้าน จึงไม่พาเข้าร้านอัตโนมัติ
   const stay = Boolean(useLocation().state?.stay);
@@ -75,8 +79,11 @@ export default function MerchantShopsPage() {
     };
 
     try {
-      const { data } = await api.post('/shops', payload);
-      setNotice(data.message);
+      const { data } = editingShopId
+        ? await api.put(`/shops/${editingShopId}`, payload)
+        : await api.post('/shops', payload);
+      setNotice(editingShopId ? 'ส่งคำขอพิจารณาร้านอีกครั้งแล้ว' : data.message);
+      setEditingShopId('');
       setForm(initialForm);
       setCategoryChoice(PRESET_CATEGORIES[0]);
       setCustomCategory('');
@@ -87,6 +94,79 @@ export default function MerchantShopsPage() {
       setError(getErrorMessage(requestError));
     } finally {
       setBusy(false);
+    }
+  }
+
+  function editRejectedShop(shop) {
+    const categoryIsPreset = PRESET_CATEGORIES.includes(shop.category);
+    const areaIsPreset = PRESET_AREAS.includes(shop.area);
+    setEditingShopId(shop.shop_id);
+    setForm({
+      name: shop.name || '',
+      category: shop.category || '',
+      area: shop.area || '',
+      description: shop.description || '',
+    });
+    setCategoryChoice(!shop.category ? '' : categoryIsPreset ? shop.category : 'อื่นๆ (ระบุเอง)');
+    setCustomCategory(categoryIsPreset ? '' : shop.category || '');
+    setAreaChoice(!shop.area ? '' : areaIsPreset ? shop.area : 'อื่นๆ (ระบุเอง)');
+    setCustomArea(areaIsPreset ? '' : shop.area || '');
+    setError('');
+    setNotice('');
+  }
+
+  function cancelEdit() {
+    setEditingShopId('');
+    setForm(initialForm);
+    setCategoryChoice(PRESET_CATEGORIES[0]);
+    setCustomCategory('');
+    setAreaChoice(PRESET_AREAS[0]);
+    setCustomArea('');
+  }
+
+  async function deleteShop(shop) {
+    setDeletingShopId(shop.shop_id);
+    setError('');
+    setNotice('');
+    try {
+      const { data } = await api.delete(`/shops/${shop.shop_id}`);
+      setNotice(data.message === 'Shop deleted' ? 'ลบร้านค้าเรียบร้อยแล้ว' : data.message);
+      await loadShops();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setDeletingShopId('');
+    }
+  }
+
+  async function changeShopStatus(shop, status) {
+    const action = status === 'CLOSED' ? 'ปิดร้าน' : 'เปิดร้านอีกครั้ง';
+    setUpdatingShopId(shop.shop_id);
+    setError('');
+    setNotice('');
+    try {
+      await api.patch(`/shops/${shop.shop_id}/status`, { status });
+      setNotice(`${action}เรียบร้อยแล้ว`);
+      await loadShops();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setUpdatingShopId('');
+    }
+  }
+
+  function askConfirmation(action, shop) {
+    setConfirmation({ action, shop });
+  }
+
+  async function confirmShopAction() {
+    if (!confirmation) return;
+    const { action, shop } = confirmation;
+    setConfirmation(null);
+    if (action === 'delete' || action === 'cancel') {
+      await deleteShop(shop);
+    } else {
+      await changeShopStatus(shop, action === 'close' ? 'CLOSED' : 'ACTIVE');
     }
   }
 
@@ -117,6 +197,11 @@ export default function MerchantShopsPage() {
                       {shop.category || 'ร้านค้า'} · {shop.area || 'ไม่ระบุพื้นที่'}
                     </small>
                     <StatusBadge status={shop.status} />
+                    {shop.status === 'SUSPENDED' && shop.rejection_reason && (
+                      <p className="shop-rejection-reason">
+                        <strong>เหตุผลที่ไม่อนุมัติ:</strong> {shop.rejection_reason}
+                      </p>
+                    )}
                     <ShopImageUpload shop={shop} onUploaded={(imagePath) => setShops((current) => current.map((item) => (item.shop_id === shop.shop_id ? { ...item, image_path: imagePath } : item)))} />
                   </div>
                   {shop.status === 'ACTIVE' ? (
@@ -139,9 +224,68 @@ export default function MerchantShopsPage() {
                       >
                         QR รับเงิน
                       </Link>
+                      <button
+                        className="button button-outline button-small"
+                        type="button"
+                        disabled={updatingShopId === shop.shop_id}
+                        onClick={() => askConfirmation('close', shop)}
+                      >
+                        {updatingShopId === shop.shop_id ? 'กำลังปิด…' : 'ปิดร้าน'}
+                      </button>
                     </div>
                   ) : (
-                    <span className="muted small-text">รอเปิดใช้งาน</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {shop.status === 'SUSPENDED' ? (
+                        <>
+                          <button
+                            className="button button-outline button-small"
+                            type="button"
+                            onClick={() => editRejectedShop(shop)}
+                          >
+                            แก้ไขและส่งพิจารณาใหม่
+                          </button>
+                          <button
+                            className="button button-danger button-small"
+                            type="button"
+                            disabled={deletingShopId === shop.shop_id}
+                            onClick={() => askConfirmation('delete', shop)}
+                          >
+                            {deletingShopId === shop.shop_id ? 'กำลังลบ…' : 'ลบร้าน'}
+                          </button>
+                        </>
+                      ) : shop.status === 'CLOSED' ? (
+                        <>
+                          <button
+                            className="button button-outline button-small"
+                            type="button"
+                            disabled={updatingShopId === shop.shop_id}
+                            onClick={() => askConfirmation('reopen', shop)}
+                          >
+                            {updatingShopId === shop.shop_id ? 'กำลังเปิด…' : 'เปิดร้านอีกครั้ง'}
+                          </button>
+                          <button
+                            className="button button-danger button-small"
+                            type="button"
+                            disabled={deletingShopId === shop.shop_id}
+                            onClick={() => askConfirmation('delete', shop)}
+                          >
+                            {deletingShopId === shop.shop_id ? 'กำลังลบ…' : 'ลบร้านถาวร'}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="muted small-text">รอเปิดใช้งาน</span>
+                          <button
+                            className="button button-warning-soft button-small"
+                            type="button"
+                            disabled={deletingShopId === shop.shop_id}
+                            onClick={() => askConfirmation('cancel', shop)}
+                          >
+                            {deletingShopId === shop.shop_id ? 'กำลังยกเลิก…' : 'ยกเลิกคำร้อง'}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </article>
               ))}
@@ -152,8 +296,8 @@ export default function MerchantShopsPage() {
         </section>
 
         <form className="card form-stack" onSubmit={createShop}>
-          <span className="eyebrow">NEW STORE</span>
-          <h2>สร้างร้านใหม่</h2>
+          <span className="eyebrow">{editingShopId ? 'EDIT STORE' : 'NEW STORE'}</span>
+          <h2>{editingShopId ? 'แก้ไขร้านและส่งพิจารณาใหม่' : 'สร้างร้านใหม่'}</h2>
           
           <label>
             ชื่อร้าน *
@@ -172,6 +316,7 @@ export default function MerchantShopsPage() {
               value={categoryChoice}
               onChange={(e) => setCategoryChoice(e.target.value)}
             >
+              <option value="">ไม่ระบุ</option>
               {PRESET_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
@@ -195,6 +340,7 @@ export default function MerchantShopsPage() {
               value={areaChoice}
               onChange={(e) => setAreaChoice(e.target.value)}
             >
+              <option value="">ไม่ระบุ</option>
               {PRESET_AREAS.map((ar) => (
                 <option key={ar} value={ar}>
                   {ar}
@@ -222,17 +368,72 @@ export default function MerchantShopsPage() {
             />
           </label>
 
-          <p className="fine-print">ร้านใหม่จะอยู่ในสถานะรออนุมัติ (PENDING) ก่อนเปิดให้บริการ</p>
-          <button className="button button-primary" disabled={busy}>
-            {busy ? 'กำลังบันทึก…' : 'ส่งคำขอสร้างร้าน'}
-          </button>
+          <p className="fine-print">
+            {editingShopId
+              ? 'เมื่อส่งคำขอ ร้านจะกลับไปรอแอดมินพิจารณา (PENDING)'
+              : 'ร้านใหม่จะอยู่ในสถานะรออนุมัติ (PENDING) ก่อนเปิดให้บริการ'}
+          </p>
+          <div className="button-row">
+            <button className="button button-primary" disabled={busy}>
+              {busy ? 'กำลังบันทึก…' : editingShopId ? 'ส่งคำขอพิจารณาใหม่' : 'ส่งคำขอสร้างร้าน'}
+            </button>
+            {editingShopId && (
+              <button className="button button-outline" type="button" disabled={busy} onClick={cancelEdit}>
+                ยกเลิก
+              </button>
+            )}
+          </div>
         </form>
       </div>
+      {confirmation && (
+        <div className="confirm-overlay" role="presentation" onClick={() => setConfirmation(null)}>
+          <section
+            className={`confirm-sheet ${['delete', 'cancel'].includes(confirmation.action) ? 'confirm-sheet-danger' : ''}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shop-confirm-title"
+            aria-describedby="shop-confirm-message"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className={`eyebrow ${['delete', 'cancel'].includes(confirmation.action) ? 'confirm-danger-label' : ''}`}>
+              ยืนยันการดำเนินการ
+            </span>
+            <h2 id="shop-confirm-title">
+              {confirmation.action === 'cancel' ? 'ยกเลิกคำร้องร้านค้า' : confirmation.action === 'delete' ? 'ลบร้านค้า' : confirmation.action === 'close' ? 'ปิดร้านค้า' : 'เปิดร้านค้าอีกครั้ง'}
+            </h2>
+            <p id="shop-confirm-message">
+              {confirmation.action === 'cancel'
+                ? `ต้องการยกเลิกคำร้องขอเปิดร้าน "${confirmation.shop.name}" ใช่ไหม? ระบบจะนำคำร้องนี้ออกจากรายการร้านของคุณ`
+                : confirmation.action === 'delete'
+                ? `ต้องการลบร้าน "${confirmation.shop.name}" แบบถาวรใช่ไหม? การลบไม่สามารถย้อนกลับได้ และหากมีธุรกรรมอ้างอิง ระบบจะไม่อนุญาตให้ลบ`
+                : confirmation.action === 'close'
+                  ? `ต้องการปิดร้าน "${confirmation.shop.name}" ใช่ไหม? ร้านจะไม่แสดงบนระบบ แต่ข้อมูลและธุรกรรมจะยังคงอยู่ และสามารถเปิดร้านอีกครั้งได้`
+                  : `ต้องการเปิดร้าน "${confirmation.shop.name}" อีกครั้งใช่ไหม? ร้านจะกลับมาแสดงบนระบบ`}
+            </p>
+            <div className="button-row confirm-actions">
+              <button className="button button-outline" type="button" onClick={() => setConfirmation(null)}>
+                ยกเลิก
+              </button>
+              <button
+                className={confirmation.action === 'delete'
+                  ? 'button button-danger'
+                  : confirmation.action === 'cancel'
+                    ? 'button button-warning'
+                    : 'button button-primary'}
+                type="button"
+                onClick={confirmShopAction}
+              >
+                {confirmation.action === 'cancel' ? 'ยืนยันยกเลิกคำร้อง' : confirmation.action === 'delete' ? 'ยืนยันลบร้าน' : confirmation.action === 'close' ? 'ยืนยันปิดร้าน' : 'ยืนยันเปิดร้าน'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
 
 function StatusBadge({ status }) {
-  const labels = { ACTIVE: 'เปิดใช้งาน', PENDING: 'รออนุมัติ', SUSPENDED: 'ไม่อนุมัติ' };
+  const labels = { ACTIVE: 'เปิดใช้งาน', PENDING: 'รออนุมัติ', SUSPENDED: 'ไม่อนุมัติ', CLOSED: 'ปิดร้าน' };
   return <span className={`status-badge status-${status?.toLowerCase()}`}>{labels[status] || status}</span>;
 }
