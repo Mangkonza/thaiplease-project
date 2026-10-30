@@ -3,6 +3,7 @@ const router = express.Router();
 const shopController = require('./shop.controller');
 const { authenticateToken, authorizeRole } = require('../../middlewares/auth.middleware');
 const { verifyShopOwner } = require('../../middlewares/shop.middleware');
+const { readImageBody, uploadShopImage } = require('./shop-image');
 
 // Public route: ประชาชนทั่วไปค้นหาร้านค้าได้ (FR-02)
 router.get('/', shopController.getAllShops);
@@ -18,5 +19,8 @@ router.get('/public/:shopId', shopController.getPublicShopById);
 
 // Protected route: อ่านข้อมูลร้านค้าตาม shopId (ตรวจสอบสิทธิ์เจ้าของร้านตาม BR-04)
 router.get('/:shopId', authenticateToken, verifyShopOwner, shopController.getShopById);
+
+// เจ้าของร้านอัปโหลดรูปหน้าร้าน ส่งไฟล์รูปเป็น body ตรงๆ (ไม่ใช่ multipart)
+router.put('/:shopId/image', authenticateToken, authorizeRole('MERCHANT', 'ADMIN'), verifyShopOwner, readImageBody, uploadShopImage);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import api, { getErrorMessage } from '../api';
+import api, { getErrorMessage, imageSrc } from '../api';
 
 // รายการตัวเลือกหมวดหมู่และพื้นที่มาตรฐาน
 const CATEGORIES = [
@@ -150,9 +150,10 @@ export default function ShopsPage() {
               to={`/shops/${shop.shop_id}`}
               key={shop.shop_id}
             >
-              <div className="shop-card-art">
+              <div className={shop.image_path ? 'shop-card-art has-image' : 'shop-card-art'}>
+                {shop.image_path && <img src={imageSrc(shop.image_path)} alt="" loading="lazy" />}
                 <span>{shop.category || 'LOCAL SHOP'}</span>
-                <b>{(shop.name || '?').slice(0, 1)}</b>
+                {!shop.image_path && <b>{(shop.name || '?').slice(0, 1)}</b>}
               </div>
               <div className="shop-card-body">
                 <span className="eyebrow">{shop.area || 'ใกล้คุณ'}</span>

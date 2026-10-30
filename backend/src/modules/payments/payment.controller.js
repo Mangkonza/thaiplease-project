@@ -6,6 +6,7 @@ const { getActivePolicy, getSubsidyUsage } = require('../policies/policy.service
 const { calculateCheckout } = require('./checkout.calculator');
 const { lockCouponForCheckout } = require('../coupons/coupon.service');
 const { completeMissions } = require('../missions/mission.service');
+const { PIN_PATTERN, getBalance, verifyPin } = require('../wallet/wallet.service');
 
 const DEFAULT_BAHT_PER_COIN = 25;
 
@@ -61,6 +62,7 @@ async function quotePayment(req, res) {
   try {
     await client.query('BEGIN');
     const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, couponId, paidAt: new Date() });
+    const walletBalance = priced.error ? null : await getBalance(client, req.user.user_id);
     await client.query('ROLLBACK');
     if (priced.error) return res.status(priced.error.status).json({ success: false, message: priced.error.message });
     const bahtPerCoin = priced.policy ? priced.policy.baht_per_coin : DEFAULT_BAHT_PER_COIN;
@@ -70,6 +72,7 @@ async function quotePayment(req, res) {
         ...priced.breakdown,
         campaign_benefit: priced.benefit,
         coins_estimate: Math.floor(priced.breakdown.shop_receives / bahtPerCoin) + (priced.benefit ? priced.benefit.bonusCoins : 0),
+        wallet_balance: walletBalance,
       },
     });
   } catch (error) {
@@ -94,6 +97,9 @@ async function createPayment(req, res) {
     });
   }
   if (!isValidCouponId(couponId)) return res.status(400).json({ success: false, message: 'coupon_id must be a UUID' });
+  if (typeof req.body.pin !== 'string' || !PIN_PATTERN.test(req.body.pin)) {
+    return res.status(400).json({ success: false, code: 'PIN_REQUIRED', message: 'pin must be exactly 6 digits' });
+  }
 
   const client = await db.pool.connect();
   try {
@@ -111,6 +117,13 @@ async function createPayment(req, res) {
       return res.status(200).json({ success: true, payment: prior.rows[0], idempotent: true });
     }
 
+    const pinCheck = await verifyPin(client, req.user.user_id, req.body.pin);
+    if (pinCheck.error) {
+      // ยังไม่ได้บันทึกรายการใด COMMIT เพื่อเก็บจำนวนครั้งที่ใส่ PIN ผิด
+      await client.query('COMMIT');
+      return res.status(pinCheck.error.status).json({ success: false, ...pinCheck.error });
+    }
+
     const paidAt = new Date();
     const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, couponId, paidAt });
     if (priced.error) {
@@ -118,6 +131,15 @@ async function createPayment(req, res) {
       return res.status(priced.error.status).json({ success: false, message: priced.error.message });
     }
     const { benefit, policy, coupon, breakdown } = priced;
+    // แถว users ถูกล็อกแล้ว ยอดกระเป๋าจึงไม่เปลี่ยนระหว่างตรวจกับหัก
+    const walletBalance = await getBalance(client, req.user.user_id);
+    if (walletBalance < breakdown.citizen_paid) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        success: false, code: 'INSUFFICIENT_BALANCE', message: 'Wallet balance is not enough',
+        balance: walletBalance, required: breakdown.citizen_paid,
+      });
+    }
     const netAmount = breakdown.shop_receives;
     const result = await client.query(
       `INSERT INTO payments (request_key, user_id, shop_id, gross_amount, discount_amount, net_amount,
@@ -128,6 +150,13 @@ async function createPayment(req, res) {
         breakdown.coupon_discount, breakdown.government_subsidy, breakdown.citizen_paid, breakdown.policy_version, paidAt]
     );
     const payment = result.rows[0];
+
+    if (breakdown.citizen_paid > 0) {
+      await client.query(
+        "INSERT INTO wallet_ledger (user_id, payment_id, amount, reason) VALUES ($1, $2, $3, 'PAYMENT')",
+        [req.user.user_id, payment.payment_id, -breakdown.citizen_paid]
+      );
+    }
 
     if (coupon) {
       await client.query(
@@ -171,6 +200,7 @@ async function createPayment(req, res) {
       missions_completed: missions,
       campaign_benefit: benefit,
       breakdown,
+      wallet_balance: Math.round((walletBalance - breakdown.citizen_paid) * 100) / 100,
     });
   } catch (error) {
     await client.query('ROLLBACK');

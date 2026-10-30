@@ -15,7 +15,7 @@ async function getCurrentPolicy(req, res) {
   }
 }
 
-// สิทธิ์รัฐช่วยจ่ายของประชาชน: ใช้ไปแล้วและคงเหลือตามเพดานรายวัน/เดือน/ทั้งโครงการ
+// สิทธิ์รัฐช่วยจ่ายของประชาชน: ใช้ไปแล้วและคงเหลือตามเพดานรายวัน/เดือน (และทั้งโครงการถ้ามี)
 async function getMySubsidy(req, res) {
   try {
     const [policy, used] = await Promise.all([
@@ -23,15 +23,17 @@ async function getMySubsidy(req, res) {
       getSubsidyUsage(db, req.user.user_id, new Date()),
     ]);
     if (!policy) return res.status(404).json({ success: false, message: 'No project policy has been configured' });
-    const left = (cap, value) => Math.max(0, Number((cap - value).toFixed(2)));
+    // cap เป็น null = ไม่มีเพดานนั้น
+    const left = (cap, value) => (cap === null ? Infinity : Math.max(0, Number((cap - value).toFixed(2))));
+    const total = left(policy.lifetime_cap, used.total);
     return res.json({
       success: true,
       policy,
       used,
       remaining: {
-        today: Math.min(left(policy.daily_cap, used.today), left(policy.monthly_cap, used.month), left(policy.lifetime_cap, used.total)),
-        month: Math.min(left(policy.monthly_cap, used.month), left(policy.lifetime_cap, used.total)),
-        total: left(policy.lifetime_cap, used.total),
+        today: Math.min(left(policy.daily_cap, used.today), left(policy.monthly_cap, used.month), total),
+        month: Math.min(left(policy.monthly_cap, used.month), total),
+        total: total === Infinity ? null : total,
       },
     });
   } catch (error) {
@@ -65,7 +67,7 @@ async function adminCreatePolicy(req, res) {
          coupon_coin_cost, coupon_value, coupon_min_spend, coupon_valid_days, program_start, program_end, note, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING ${policyColumns('p')}`,
-      [input.copay_percent, input.daily_cap, input.monthly_cap, input.lifetime_cap, input.baht_per_coin,
+      [input.copay_percent, input.daily_cap, input.monthly_cap, input.lifetime_cap ?? null, input.baht_per_coin,
         input.coupon_coin_cost, input.coupon_value, input.coupon_min_spend, input.coupon_valid_days,
         input.program_start, input.program_end, note, req.user.user_id]
     );

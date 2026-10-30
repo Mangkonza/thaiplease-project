@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api, { getErrorMessage } from '../api';
 import { useAuth } from '../auth-context';
 
@@ -10,7 +9,6 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const { signIn } = useAuth();
-  const navigate = useNavigate();
 
   async function submit(event) {
     event.preventDefault();
@@ -26,8 +24,8 @@ export default function AuthPage() {
         });
       }
       const { data } = await api.post('/auth/login', { email: form.email, password: form.password });
+      // route /login พาไปหน้าถัดไปเองเมื่อมี user (ดู LoginRoute ใน App.jsx)
       signIn(data.token, data.user);
-      navigate(data.user.role === 'MERCHANT' ? '/merchant/shops' : data.user.role === 'ADMIN' ? '/admin/shops' : '/shops');
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {

@@ -5,6 +5,7 @@ process.env.DB_NAME = 'test_db';
 process.env.JWT_SECRET = 'test_jwt_secret';
 
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const db = require('../src/config/db');
 const app = require('../src/app');
 
@@ -38,4 +39,16 @@ function signToken(payload, options = { expiresIn: '1h' }) {
   return jwt.sign(payload, process.env.JWT_SECRET, options);
 }
 
-module.exports = { db, startServer, signToken };
+const TEST_PIN = '123456';
+const TEST_PIN_HASH = bcrypt.hashSync(TEST_PIN, 4);
+
+// แถวที่การจ่ายเงินต้องอ่านเพิ่ม: PIN ของผู้จ่ายและยอดในกระเป๋าเงิน; คืน null ถ้าเป็นคำสั่งอื่น
+function paymentAccountRows(sql, { balance = 100000, pinHash = TEST_PIN_HASH } = {}) {
+  if (sql.includes('SELECT pin_hash, pin_failed_attempts')) {
+    return { rows: [{ pin_hash: pinHash, pin_failed_attempts: 0, pin_locked_until: null }] };
+  }
+  if (sql.includes('FROM wallet_ledger WHERE user_id')) return { rows: [{ balance: String(balance) }] };
+  return null;
+}
+
+module.exports = { db, startServer, signToken, TEST_PIN, TEST_PIN_HASH, paymentAccountRows };

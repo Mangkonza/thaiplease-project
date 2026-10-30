@@ -1,7 +1,7 @@
 const { test, describe, before, after, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const { db, startServer, signToken } = require('./helpers');
-const { validatePolicyInput } = require('../src/modules/policies/policy.service');
+const { validatePolicyInput, normalizePolicy } = require('../src/modules/policies/policy.service');
 
 const ADMIN_ID = '11111111-1111-4111-8111-111111111111';
 const CITIZEN_ID = '22222222-2222-4222-8222-222222222222';
@@ -86,6 +86,28 @@ describe('POST /admin/policies', () => {
     mock.method(db, 'query', async (sql) => activeUser(sql) || { rows: [] });
     const response = await api.request('POST', '/api/v1/admin/policies', { token: citizenToken, body: VALID_INPUT });
     assert.equal(response.status, 403);
+  });
+});
+
+describe('optional lifetime cap', () => {
+  test('an empty lifetime cap means no project-wide cap', () => {
+    assert.deepEqual(validatePolicyInput({ ...VALID_INPUT, lifetime_cap: null }), []);
+    const { lifetime_cap: _omit, ...withoutLifetime } = VALID_INPUT;
+    assert.deepEqual(validatePolicyInput(withoutLifetime), []);
+    assert.equal(normalizePolicy({ ...POLICY_ROW, lifetime_cap: null }).lifetime_cap, null);
+  });
+
+  test('subsidy without a lifetime cap reports no project-wide remaining', async () => {
+    mock.method(db, 'query', async (sql) => {
+      const user = activeUser(sql);
+      if (user) return user;
+      if (sql.includes('FROM project_policies')) return { rows: [{ ...POLICY_ROW, monthly_cap: '1000.00', lifetime_cap: null }] };
+      if (sql.includes('SUM(government_subsidy)')) return { rows: [{ today: '0', month: '900.00', total: '20000.00' }] };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const response = await api.request('GET', '/api/v1/users/me/subsidy', { token: citizenToken });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.remaining, { today: 100, month: 100, total: null });
   });
 });
 
