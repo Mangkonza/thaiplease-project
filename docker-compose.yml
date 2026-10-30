@@ -24,6 +24,7 @@ services:
       # รันหลัง seed เพื่อเติมยอดเริ่มต้นในกระเป๋าเงินให้ประชาชนใน seed
       - ./docker/postgres/08_wallet_pin_images.sql:/docker-entrypoint-initdb.d/08_wallet_pin_images.sql
       - ./docker/postgres/09_monthly_cap_only.sql:/docker-entrypoint-initdb.d/09_monthly_cap_only.sql
+      - ./docker/postgres/10_shop_closure.sql:/docker-entrypoint-initdb.d/10_shop_closure.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U thaiplease_user -d thaiplease_db"]
       interval: 5s
