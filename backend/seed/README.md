@@ -11,12 +11,15 @@
 | `admin@thaiplease.test` | ADMIN | ACTIVE | |
 | `merchant.a@thaiplease.test` | MERCHANT | ACTIVE | เจ้าของร้านกาแฟบ้านสวน (ร้าน story) และบ้านสวนเบเกอรี่ (SUSPENDED) |
 | `merchant.b@thaiplease.test` | MERCHANT | ACTIVE | เจ้าของข้าวมันไก่ป้าแดง และขนมไทยแม่ศรี (PENDING) |
+| `merchant.c@thaiplease.test` … `merchant.j@thaiplease.test` | MERCHANT | ACTIVE | เจ้าของร้านเพิ่มเติม 8 ร้าน คนละ 1 ร้าน |
 | `citizen01@thaiplease.test` … `citizen80@thaiplease.test` | CITIZEN | ACTIVE | pool สำหรับแบ่ง Treatment/Control (D-02) |
 | `suspended@thaiplease.test` | CITIZEN | SUSPENDED | ใช้ทดสอบ AT-02 (ได้ 403) |
 
 ## ข้อมูลที่ได้
 
-- ร้าน: ACTIVE 2, PENDING 1, SUSPENDED 1 (คำอธิบายร้านเขียนแบบร้านจริง เพื่อไม่ให้หน้าเว็บเฉลย story ก่อน AI วิเคราะห์)
+- ร้าน: ACTIVE 10, PENDING 1, SUSPENDED 1 (คำอธิบายร้านเขียนแบบร้านจริง เพื่อไม่ให้หน้าเว็บเฉลย story ก่อน AI วิเคราะห์)
+- หมวดหมู่และพื้นที่ใช้ค่าเดียวกับตัวกรองในหน้าค้นหาร้าน ร้านเพิ่มเติม 8 ร้านมีลูกค้าสุ่มจากประชาชนทั้ง 80 คน และแนวโน้มยอดต่างกัน (โต, คงที่, ลดลง)
+- รายการตั้งแต่ 1 ต.ค. 2026 (เริ่มโครงการ) มีรัฐช่วยจ่าย 60% ตามเพดานวันละ 200 / เดือนละ 1,000 บาท
 - Payment ย้อนหลัง 8 สัปดาห์ (จันทร์-อาทิตย์) จบที่ `--end`
 - **Story ของร้านกาแฟบ้านสวน:** สัปดาห์ล่าสุดลูกค้าใหม่เหลือ 1 คน (ก่อนหน้า 3-6 คน/สัปดาห์) และยอดขาย/ออเดอร์ลดลงจากสัปดาห์ก่อน → AI ควรเห็นปัญหาลูกค้าใหม่ลดลง
 - Citizen ที่ไม่เคยซื้อร้านกาแฟบ้านสวน ≥ 40 คน ทำให้โปร NEW_CUSTOMER ผ่านเกณฑ์ ≥ 20 คนต่อกลุ่ม (D-05)
@@ -31,7 +34,7 @@ ID คงที่ทุกครั้ง เช่น ร้านกาแฟ
 ก่อน demo ควรสร้างใหม่ให้สัปดาห์ล่าสุดเป็นสัปดาห์ที่แล้ว
 
 ```bash
-npm run seed:generate -- --end 2026-10-18
+npm run seed:generate -- --end 2026-10-25
 ```
 
 ## ใส่ข้อมูลลงฐานข้อมูล
