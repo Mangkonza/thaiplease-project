@@ -27,6 +27,10 @@ services:
       - ./docker/postgres/10_shop_closure.sql:/docker-entrypoint-initdb.d/10_shop_closure.sql
       - ./docker/postgres/11_templates_missions.sql:/docker-entrypoint-initdb.d/11_templates_missions.sql
       - ./docker/postgres/12_budget_total.sql:/docker-entrypoint-initdb.d/12_budget_total.sql
+      - ./docker/postgres/13_payment_requests.sql:/docker-entrypoint-initdb.d/13_payment_requests.sql
+      - ./docker/postgres/14_shop_details.sql:/docker-entrypoint-initdb.d/14_shop_details.sql
+      - ./docker/postgres/15_seed_registration_dates.sql:/docker-entrypoint-initdb.d/15_seed_registration_dates.sql
+      - ./docker/postgres/16_seed_cases.sql:/docker-entrypoint-initdb.d/16_seed_cases.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U thaiplease_user -d thaiplease_db"]
       interval: 5s

@@ -7,11 +7,9 @@ const { calculateCheckout } = require('./checkout.calculator');
 const { lockCouponForCheckout } = require('../coupons/coupon.service');
 const { completeMissions } = require('../missions/mission.service');
 const { PIN_PATTERN, getBalance, verifyPin } = require('../wallet/wallet.service');
+const { loadPayableRequest } = require('../payment-requests/payment-request.service');
 
 const DEFAULT_BAHT_PER_COIN = 25;
-
-const isValidAmount = (amount) => Number.isFinite(amount) && amount > 0 &&
-  amount <= 9999999999.99 && Math.abs(Math.round(amount * 100) - amount * 100) <= 1e-8;
 
 // coupon_id ไม่บังคับ ส่งมาเป็น null หรือไม่ส่งเลย = ไม่ใช้คูปอง
 const readCouponId = (value) => (value === undefined || value === null || value === '' ? null : value);
@@ -49,22 +47,29 @@ async function priceCheckout(client, { shopId, userId, grossAmount, couponId, pa
   return { benefit, policy, coupon, breakdown };
 }
 
+// ยอดเงินและร้านมาจากคำขอรับเงินที่ร้านสร้าง (แบบไทยพลัส) ลูกค้าส่งได้แค่ id ของคำขอ
 async function quotePayment(req, res) {
-  const { shop_id: shopId, gross_amount: grossAmount } = req.body;
-  const amount = Number(grossAmount);
+  const requestId = req.body.payment_request_id;
   const couponId = readCouponId(req.body.coupon_id);
-  if (!UUID_PATTERN.test(shopId || '') || !isValidAmount(amount)) {
-    return res.status(400).json({ success: false, message: 'shop_id and a positive gross_amount are required' });
+  if (!UUID_PATTERN.test(requestId || '')) {
+    return res.status(400).json({ success: false, message: 'payment_request_id is required' });
   }
   if (!isValidCouponId(couponId)) return res.status(400).json({ success: false, message: 'coupon_id must be a UUID' });
 
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
-    const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, couponId, paidAt: new Date() });
+    const paidAt = new Date();
+    const loaded = await loadPayableRequest(client, requestId, { now: paidAt });
+    const priced = loaded.error ? loaded : await priceCheckout(client, {
+      shopId: loaded.request.shop_id, userId: req.user.user_id, grossAmount: loaded.request.amount, couponId, paidAt,
+    });
     const walletBalance = priced.error ? null : await getBalance(client, req.user.user_id);
     await client.query('ROLLBACK');
-    if (priced.error) return res.status(priced.error.status).json({ success: false, message: priced.error.message });
+    if (priced.error) {
+      const { status, ...body } = priced.error;
+      return res.status(status).json({ success: false, ...body });
+    }
     const bahtPerCoin = priced.policy ? priced.policy.baht_per_coin : DEFAULT_BAHT_PER_COIN;
     return res.json({
       success: true,
@@ -85,15 +90,14 @@ async function quotePayment(req, res) {
 }
 
 async function createPayment(req, res) {
-  const { shop_id: shopId, request_key: requestKey, gross_amount: grossAmount } = req.body;
-  const amount = Number(grossAmount);
+  const { payment_request_id: paymentRequestId, request_key: requestKey } = req.body;
   const couponId = readCouponId(req.body.coupon_id);
 
-  if (!UUID_PATTERN.test(shopId || '') || !requestKey || typeof requestKey !== 'string' || requestKey.length > 100 ||
-      !requestKey.trim() || !isValidAmount(amount)) {
+  if (!UUID_PATTERN.test(paymentRequestId || '') || !requestKey || typeof requestKey !== 'string' || requestKey.length > 100 ||
+      !requestKey.trim()) {
     return res.status(400).json({
       success: false,
-      message: 'shop_id, request_key, and a positive gross_amount are required',
+      message: 'payment_request_id and request_key are required',
     });
   }
   if (!isValidCouponId(couponId)) return res.status(400).json({ success: false, message: 'coupon_id must be a UUID' });
@@ -117,6 +121,16 @@ async function createPayment(req, res) {
       return res.status(200).json({ success: true, payment: prior.rows[0], idempotent: true });
     }
 
+    // ล็อกคำขอไว้จนจบ transaction ลูกค้าสองคนจึงจ่ายคำขอเดียวกันพร้อมกันไม่ได้
+    const paidAt = new Date();
+    const loaded = await loadPayableRequest(client, paymentRequestId, { lock: true, now: paidAt });
+    if (loaded.error) {
+      await client.query('ROLLBACK');
+      const { status, ...body } = loaded.error;
+      return res.status(status).json({ success: false, ...body });
+    }
+    const { shop_id: shopId, amount } = loaded.request;
+
     const pinCheck = await verifyPin(client, req.user.user_id, req.body.pin);
     if (pinCheck.error) {
       // ยังไม่ได้บันทึกรายการใด COMMIT เพื่อเก็บจำนวนครั้งที่ใส่ PIN ผิด
@@ -124,7 +138,6 @@ async function createPayment(req, res) {
       return res.status(pinCheck.error.status).json({ success: false, ...pinCheck.error });
     }
 
-    const paidAt = new Date();
     const priced = await priceCheckout(client, { shopId, userId: req.user.user_id, grossAmount: amount, couponId, paidAt });
     if (priced.error) {
       await client.query('ROLLBACK');
@@ -150,6 +163,10 @@ async function createPayment(req, res) {
         breakdown.coupon_discount, breakdown.government_subsidy, breakdown.citizen_paid, breakdown.policy_version, paidAt]
     );
     const payment = result.rows[0];
+    await client.query(
+      "UPDATE payment_requests SET status = 'PAID', payment_id = $2 WHERE request_id = $1",
+      [paymentRequestId, payment.payment_id]
+    );
 
     if (breakdown.citizen_paid > 0) {
       await client.query(

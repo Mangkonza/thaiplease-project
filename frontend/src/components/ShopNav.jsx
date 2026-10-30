@@ -5,7 +5,7 @@ import api from '../api';
 const SECTIONS = [
   { key: 'dashboard', label: 'ยอดขายและ AI' },
   { key: 'campaigns', label: 'แคมเปญ' },
-  { key: 'qr', label: 'QR รับเงิน' },
+  { key: 'qr', label: 'รับเงิน / หน้าร้าน' },
 ];
 
 // แถบเมนูของร้าน: สลับยอดขาย/แคมเปญ และสลับร้านสำหรับเจ้าของที่มีหลายร้าน

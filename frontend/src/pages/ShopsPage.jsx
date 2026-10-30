@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import api, { getErrorMessage, imageSrc } from '../api';
+import { useSearchParams } from 'react-router-dom';
+import api, { getErrorMessage } from '../api';
+import ShopCard from '../components/ShopCard';
 
 // รายการตัวเลือกหมวดหมู่และพื้นที่มาตรฐาน
 const CATEGORIES = [
@@ -65,16 +66,16 @@ export default function ShopsPage() {
     <div className="content-stack">
       <section className="hero-banner">
         <div>
-          <span className="eyebrow">GOOD PLACES, GOOD DAYS</span>
+          <span className="eyebrow">RECOMMENDED FOR YOU</span>
           <h1>
-            ร้านโปรดในชุมชน
+            ร้านแนะนำ
             <br />
-            รอให้คุณไปค้นพบ
+            <span className="glow-text">ใช้สิทธิ์รัฐช่วยจ่ายได้</span>
           </h1>
-          <p>ทุกการแวะเวียน ช่วยให้ร้านท้องถิ่นเติบโตไปด้วยกัน</p>
+          <p>ร้านในชุมชนที่ร่วมโครงการ จ่ายผ่าน G-Wallet แล้วรับเหรียญสะสมทุกครั้ง</p>
         </div>
         <div className="hero-illustration" aria-hidden="true">
-          <span>♡</span>
+          <span>✦</span>
           <i>
             LOCAL
             <br />
@@ -122,14 +123,14 @@ export default function ShopsPage() {
             </select>
           </label>
 
-          <button className="button button-dark">ค้นหาร้าน</button>
+          <button className="button button-dark">ค้นหา</button>
         </form>
       </section>
 
       <div className="section-heading">
         <div>
           <span className="eyebrow">THE NEIGHBORHOOD</span>
-          <h2>ร้านที่น่าแวะ</h2>
+          <h2>ร้านที่ร่วมโครงการ</h2>
         </div>
         <span className="muted">{shops.length} ร้าน</span>
       </div>
@@ -144,27 +145,7 @@ export default function ShopsPage() {
         <p className="muted">กำลังโหลดร้านค้า…</p>
       ) : shops.length ? (
         <div className="shop-grid">
-          {shops.map((shop, index) => (
-            <Link
-              className={`shop-card shop-color-${index % 4}`}
-              to={`/shops/${shop.shop_id}`}
-              key={shop.shop_id}
-            >
-              <div className={shop.image_path ? 'shop-card-art has-image' : 'shop-card-art'}>
-                {shop.image_path && <img src={imageSrc(shop.image_path)} alt="" loading="lazy" />}
-                <span>{shop.category || 'LOCAL SHOP'}</span>
-                {!shop.image_path && <b>{(shop.name || '?').slice(0, 1)}</b>}
-              </div>
-              <div className="shop-card-body">
-                <span className="eyebrow">{shop.area || 'ใกล้คุณ'}</span>
-                <h3>{shop.name}</h3>
-                <p>{shop.description || 'ร้านค้าในชุมชน พร้อมต้อนรับคุณ'}</p>
-                <span className="link-arrow">
-                  ดูรายละเอียด <b>↗</b>
-                </span>
-              </div>
-            </Link>
-          ))}
+          {shops.map((shop, index) => <ShopCard key={shop.shop_id} shop={shop} index={index} />)}
         </div>
       ) : (
         <div className="empty-state">

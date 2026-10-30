@@ -1,6 +1,6 @@
 const { test, describe, before, after, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
-const { db, startServer, signToken, TEST_PIN, paymentAccountRows } = require('./helpers');
+const { db, startServer, signToken, TEST_PIN, paymentAccountRows, paymentRequestFor, paymentRequestRows } = require('./helpers');
 const { enrollmentStatus, validateMissionInput } = require('../src/modules/missions/mission.service');
 
 const ADMIN_ID = '11111111-1111-4111-8111-111111111111';
@@ -43,6 +43,8 @@ describe('completing a mission during payment', () => {
       query: async (sql, params) => {
         const account = paymentAccountRows(sql);
         if (account) return account;
+        const payable = paymentRequestRows(sql, params);
+        if (payable) return payable;
         statements.push({ sql, params });
         if (sql.includes('SELECT shop_id, status FROM shops')) return { rows: [{ shop_id: SHOP_ID, status: 'ACTIVE' }] };
         if (sql.includes('INSERT INTO payments')) return { rows: [{ payment_id: PAYMENT_ID, status: 'SUCCESS' }] };
@@ -60,7 +62,7 @@ describe('completing a mission during payment', () => {
   test('rewards coins tied to the payment when the target is reached', async () => {
     const statements = mockPayment(2);
     const response = await api.request('POST', '/api/v1/payments', {
-      token: citizenToken, body: { shop_id: SHOP_ID, pin: TEST_PIN, request_key: 'mission-pay-1', gross_amount: 100 },
+      token: citizenToken, body: { payment_request_id: paymentRequestFor(SHOP_ID, 100), pin: TEST_PIN, request_key: 'mission-pay-1' },
     });
     assert.equal(response.status, 201);
     assert.equal(response.body.coins_earned, 4 + 50);
@@ -74,7 +76,7 @@ describe('completing a mission during payment', () => {
   test('gives nothing before the target is reached', async () => {
     const statements = mockPayment(1);
     const response = await api.request('POST', '/api/v1/payments', {
-      token: citizenToken, body: { shop_id: SHOP_ID, pin: TEST_PIN, request_key: 'mission-pay-2', gross_amount: 100 },
+      token: citizenToken, body: { payment_request_id: paymentRequestFor(SHOP_ID, 100), pin: TEST_PIN, request_key: 'mission-pay-2' },
     });
     assert.equal(response.status, 201);
     assert.equal(response.body.coins_earned, 4);
@@ -125,6 +127,8 @@ describe('admin missions', () => {
       query: async (sql, params) => {
         const account = paymentAccountRows(sql);
         if (account) return account;
+        const payable = paymentRequestRows(sql, params);
+        if (payable) return payable;
         statements.push({ sql, params });
         return { rows: handler(sql) || [] };
       },

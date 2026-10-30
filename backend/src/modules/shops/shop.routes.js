@@ -4,6 +4,7 @@ const shopController = require('./shop.controller');
 const { authenticateToken, authorizeRole } = require('../../middlewares/auth.middleware');
 const { verifyShopOwner } = require('../../middlewares/shop.middleware');
 const { readImageBody, uploadShopImage } = require('./shop-image');
+const { updateShopDetails } = require('./shop-details');
 
 // Public route: ประชาชนทั่วไปค้นหาร้านค้าได้ (FR-02)
 router.get('/', shopController.getAllShops);
@@ -26,6 +27,9 @@ router.patch('/:shopId/status', authenticateToken, authorizeRole('MERCHANT'), ve
 
 // Protected route: อ่านข้อมูลร้านค้าตาม shopId (ตรวจสอบสิทธิ์เจ้าของร้านตาม BR-04)
 router.get('/:shopId', authenticateToken, verifyShopOwner, shopController.getShopById);
+
+// เจ้าของร้านแก้ที่อยู่ เวลาเปิด พิกัด และรายการสินค้าที่แสดงในหน้าร้านแนะนำ
+router.put('/:shopId/details', authenticateToken, authorizeRole('MERCHANT'), verifyShopOwner, updateShopDetails);
 
 // เจ้าของร้านอัปโหลดรูปหน้าร้าน ส่งไฟล์รูปเป็น body ตรงๆ (ไม่ใช่ multipart)
 router.put('/:shopId/image', authenticateToken, authorizeRole('MERCHANT', 'ADMIN'), verifyShopOwner, readImageBody, uploadShopImage);

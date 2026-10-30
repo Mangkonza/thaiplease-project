@@ -103,8 +103,8 @@ function SuggestionCard({ suggestion, onUse }) {
         <span style={{
           fontSize: '0.75rem',
           fontWeight: 'bold',
-          color: '#2e7d32',
-          background: '#e8f5e9',
+          color: 'var(--accent)',
+          background: 'var(--accent-soft)',
           padding: '2px 10px',
           borderRadius: '12px',
         }}>
@@ -318,7 +318,7 @@ export default function ShopDashboardPage() {
           <Link to="/merchant/shops" state={{ stay: true }} style={{ color: '#64748b', display: 'flex', alignItems: 'center', textDecoration: 'none' }} title="กลับไปร้านค้าของฉัน">
             <ArrowLeft style={{ width: 20, height: 20 }} />
           </Link>
-          <div style={{ background: '#2e7d32', color: '#fff', borderRadius: 12, padding: 8, display: 'flex' }}>
+          <div style={{ background: 'var(--accent)', color: '#fff', borderRadius: 12, padding: 8, display: 'flex' }}>
             <Store style={{ width: 22, height: 22 }} />
           </div>
           <div>
@@ -357,7 +357,7 @@ export default function ShopDashboardPage() {
                       style={{
                         border: 'none',
                         background: periodType === tab.value ? '#fff' : 'transparent',
-                        color: periodType === tab.value ? '#2e7d32' : '#64748b',
+                        color: periodType === tab.value ? 'var(--accent)' : '#64748b',
                         fontWeight: '600',
                         fontSize: '0.85rem',
                         padding: '6px 14px',
@@ -424,7 +424,7 @@ export default function ShopDashboardPage() {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ background: '#2e7d32', color: '#fff', padding: 8, borderRadius: 12, display: 'flex' }}>
+                <div style={{ background: 'var(--accent)', color: '#fff', padding: 8, borderRadius: 12, display: 'flex' }}>
                   <Sparkles style={{ width: 20, height: 20 }} />
                 </div>
                 <div>
@@ -439,7 +439,7 @@ export default function ShopDashboardPage() {
                 title={isInsufficientData ? 'ข้อมูลช่วงเวลานี้ยังไม่เพียงพอสำหรับสร้างคำแนะนำ' : ''}
                 style={{
                   border: 'none',
-                  background: '#2e7d32',
+                  background: 'var(--accent)',
                   color: '#fff',
                   padding: '10px 20px',
                   borderRadius: 10,
@@ -466,7 +466,7 @@ export default function ShopDashboardPage() {
 
             {generating ? (
               <div style={{ padding: '36px 0', textAlign: 'center', color: '#64748b' }}>
-                <LoaderCircle style={{ width: 32, height: 32, margin: '0 auto 12px', color: '#2e7d32' }} className="animate-spin" />
+                <LoaderCircle style={{ width: 32, height: 32, margin: '0 auto 12px', color: 'var(--accent)' }} className="animate-spin" />
                 <p style={{ margin: 0, fontWeight: '600' }}>AI กำลังวิเคราะห์ตัวเลขของร้าน...</p>
                 <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>ระบบตรวจสอบคำตอบกับตัวเลขจริงในร้านก่อนบันทึกทุกครั้ง</p>
               </div>

@@ -1,6 +1,6 @@
 const { test, describe, before, after, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
-const { db, startServer, signToken, TEST_PIN, TEST_PIN_HASH, paymentAccountRows } = require('./helpers');
+const { db, startServer, signToken, TEST_PIN, TEST_PIN_HASH, paymentAccountRows, paymentRequestFor, paymentRequestRows } = require('./helpers');
 const { refundPayment } = require('../src/modules/cases/case.service');
 
 const CITIZEN_ID = '22222222-2222-4222-8222-222222222222';
@@ -26,6 +26,8 @@ function mockPayment(overrides = () => null) {
       if (custom) return custom;
       const account = paymentAccountRows(sql);
       if (account) return account;
+      const payable = paymentRequestRows(sql, params);
+      if (payable) return payable;
       if (sql.includes('SELECT shop_id, status FROM shops')) return { rows: [{ shop_id: SHOP_ID, status: 'ACTIVE' }] };
       if (sql.includes('INSERT INTO payments')) return { rows: [{ payment_id: PAYMENT_ID, status: 'SUCCESS' }] };
       return { rows: [] };
@@ -36,7 +38,7 @@ function mockPayment(overrides = () => null) {
 }
 
 const pay = (body = {}) => api.request('POST', '/api/v1/payments', {
-  token, body: { shop_id: SHOP_ID, request_key: crypto.randomUUID(), gross_amount: 100, pin: TEST_PIN, ...body },
+  token, body: { payment_request_id: paymentRequestFor(SHOP_ID, 100), request_key: crypto.randomUUID(), pin: TEST_PIN, ...body },
 });
 const has = (statements, text) => statements.some((s) => s.sql.includes(text));
 
@@ -114,7 +116,7 @@ describe('paying from the wallet with a PIN', () => {
 
   test('quote shows the wallet balance', async () => {
     mockPayment((sql) => (sql.includes('FROM wallet_ledger WHERE user_id') ? { rows: [{ balance: '250.50' }] } : null));
-    const response = await api.request('POST', '/api/v1/payments/quote', { token, body: { shop_id: SHOP_ID, gross_amount: 100 } });
+    const response = await api.request('POST', '/api/v1/payments/quote', { token, body: { payment_request_id: paymentRequestFor(SHOP_ID, 100) } });
     assert.equal(response.status, 200);
     assert.equal(response.body.quote.wallet_balance, 250.5);
   });

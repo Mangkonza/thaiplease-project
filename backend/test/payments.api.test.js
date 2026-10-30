@@ -1,6 +1,6 @@
 const { test, describe, before, after, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
-const { db, startServer, signToken, TEST_PIN, paymentAccountRows } = require('./helpers');
+const { db, startServer, signToken, TEST_PIN, paymentAccountRows, paymentRequestFor, paymentRequestRows } = require('./helpers');
 
 const CITIZEN_ID = '22222222-2222-4222-8222-222222222222';
 const SHOP_ID = '33333333-3333-4333-8333-333333333333';
@@ -27,6 +27,8 @@ describe('POST /payments', () => {
       query: async (sql, params) => {
         const account = paymentAccountRows(sql);
         if (account) return account;
+        const payable = paymentRequestRows(sql, params);
+        if (payable) return payable;
         statements.push(sql.trim().split(/\s+/).slice(0, 4).join(' '));
         if (sql.includes('SELECT * FROM payments WHERE request_key')) return { rows: [] };
         if (sql.includes('SELECT shop_id, status FROM shops')) return { rows: [{ shop_id: SHOP_ID, status: 'ACTIVE' }] };
@@ -44,7 +46,7 @@ describe('POST /payments', () => {
 
     const response = await api.request('POST', '/api/v1/payments', {
       token,
-      body: { shop_id: SHOP_ID, pin: TEST_PIN, request_key: 'payment-test-1', gross_amount: 100 },
+      body: { payment_request_id: paymentRequestFor(SHOP_ID, 100), pin: TEST_PIN, request_key: 'payment-test-1' },
     });
 
     assert.equal(response.status, 201);
@@ -65,6 +67,8 @@ describe('POST /payments', () => {
       query: async (sql, params) => {
         const account = paymentAccountRows(sql);
         if (account) return account;
+        const payable = paymentRequestRows(sql, params);
+        if (payable) return payable;
         if (sql.includes('SELECT * FROM payments WHERE request_key')) return { rows: [] };
         if (sql.includes('SELECT shop_id, status FROM shops')) return { rows: [{ shop_id: SHOP_ID, status: 'ACTIVE' }] };
         if (sql.includes('FROM users WHERE user_id = $1 FOR UPDATE')) { lockedUser = true; return { rows: [] }; }
@@ -84,7 +88,7 @@ describe('POST /payments', () => {
     }));
 
     const response = await api.request('POST', '/api/v1/payments', {
-      token, body: { shop_id: SHOP_ID, pin: TEST_PIN, request_key: 'payment-test-copay', gross_amount: 100 },
+      token, body: { payment_request_id: paymentRequestFor(SHOP_ID, 100), pin: TEST_PIN, request_key: 'payment-test-copay' },
     });
 
     assert.equal(response.status, 201);
@@ -100,9 +104,11 @@ describe('POST /payments', () => {
     ));
     const statements = [];
     mock.method(db.pool, 'connect', async () => ({
-      query: async (sql) => {
+      query: async (sql, params) => {
         const account = paymentAccountRows(sql);
         if (account) return account;
+        const payable = paymentRequestRows(sql, params);
+        if (payable) return payable;
         statements.push(sql.trim().split(/\s+/).slice(0, 3).join(' '));
         if (sql.includes('SELECT shop_id, status FROM shops')) return { rows: [{ shop_id: SHOP_ID, status: 'ACTIVE' }] };
         if (sql.includes('FROM project_policies')) return { rows: [POLICY_ROW] };
@@ -113,7 +119,7 @@ describe('POST /payments', () => {
     }));
 
     const response = await api.request('POST', '/api/v1/payments/quote', {
-      token, body: { shop_id: SHOP_ID, gross_amount: 250 },
+      token, body: { payment_request_id: paymentRequestFor(SHOP_ID, 250) },
     });
 
     assert.equal(response.status, 200);
@@ -129,24 +135,84 @@ describe('POST /payments', () => {
       sql.startsWith('SELECT status FROM users') ? { rows: [{ status: 'ACTIVE' }] } : { rows: [] }
     ));
     mock.method(db.pool, 'connect', async () => ({
-      query: async (sql) => (sql.includes('FROM shops') ? { rows: [{ shop_id: SHOP_ID, status: 'SUSPENDED' }] } : { rows: [] }),
+      query: async (sql, params) => paymentRequestRows(sql, params)
+        || (sql.includes('FROM shops') ? { rows: [{ shop_id: SHOP_ID, status: 'SUSPENDED' }] } : { rows: [] }),
       release() {},
     }));
     const response = await api.request('POST', '/api/v1/payments/quote', {
-      token, body: { shop_id: SHOP_ID, gross_amount: 100 },
+      token, body: { payment_request_id: paymentRequestFor(SHOP_ID, 100) },
     });
     assert.equal(response.status, 409);
   });
 
-  test('rejects invalid amounts before opening a transaction', async () => {
+  test('rejects a missing or malformed payment request id before opening a transaction', async () => {
     const connect = mock.method(db.pool, 'connect', async () => { throw new Error('must not connect'); });
     mock.method(db, 'query', async (sql) => (
       sql.startsWith('SELECT status FROM users') ? { rows: [{ status: 'ACTIVE' }] } : { rows: [] }
     ));
     const response = await api.request('POST', '/api/v1/payments', {
-      token, body: { shop_id: SHOP_ID, pin: TEST_PIN, request_key: 'invalid', gross_amount: -1 },
+      token, body: { payment_request_id: 'not-a-uuid', pin: TEST_PIN, request_key: 'invalid' },
     });
     assert.equal(response.status, 400);
     assert.equal(connect.mock.callCount(), 0);
+  });
+});
+
+describe('POST /payments uses the shop payment request (Thai Plus)', () => {
+  // จ่ายคำขอที่กำหนด แล้วคืนคำสั่ง SQL ทั้งหมดที่รันใน transaction
+  async function payRequest(requestId, extraBody = {}) {
+    mock.method(db, 'query', async (sql) => (
+      sql.startsWith('SELECT status FROM users') ? { rows: [{ status: 'ACTIVE' }] } : { rows: [] }
+    ));
+    const statements = [];
+    mock.method(db.pool, 'connect', async () => ({
+      query: async (sql, params) => {
+        statements.push({ sql, params });
+        const account = paymentAccountRows(sql);
+        if (account) return account;
+        const payable = paymentRequestRows(sql, params);
+        if (payable) return payable;
+        if (sql.includes('SELECT shop_id, status FROM shops')) return { rows: [{ shop_id: SHOP_ID, status: 'ACTIVE' }] };
+        if (sql.includes('INSERT INTO payments')) return { rows: [{ payment_id: PAYMENT_ID, status: 'SUCCESS' }] };
+        return { rows: [] };
+      },
+      release() {},
+    }));
+    const response = await api.request('POST', '/api/v1/payments', {
+      token, body: { payment_request_id: requestId, pin: TEST_PIN, request_key: crypto.randomUUID(), ...extraBody },
+    });
+    return { response, statements };
+  }
+  const ran = (statements, text) => statements.find((s) => s.sql.includes(text));
+
+  test('charges the amount the shop entered, ignores any amount sent by the citizen, and marks the request paid', async () => {
+    const requestId = paymentRequestFor(SHOP_ID, 80);
+    const { response, statements } = await payRequest(requestId, { gross_amount: 1 });
+    assert.equal(response.status, 201);
+    assert.ok(ran(statements, 'FROM payment_requests WHERE request_id = $1 FOR UPDATE'), 'the request row must be locked');
+    assert.equal(ran(statements, 'INSERT INTO payments').params[3], 80);
+    assert.deepEqual(ran(statements, 'UPDATE payment_requests').params, [requestId, PAYMENT_ID]);
+  });
+
+  const refusals = [
+    ['expired after 5 minutes', { expires_at: new Date(Date.now() - 1000) }, 410, 'REQUEST_EXPIRED'],
+    ['already paid', { status: 'PAID', payment_id: PAYMENT_ID }, 409, 'REQUEST_ALREADY_PAID'],
+    ['cancelled by the shop', { status: 'CANCELLED' }, 409, 'REQUEST_CANCELLED'],
+  ];
+  for (const [name, overrides, status, code] of refusals) {
+    test(`refuses a request that is ${name} before checking the PIN`, async () => {
+      const { response, statements } = await payRequest(paymentRequestFor(SHOP_ID, 100, overrides));
+      assert.equal(response.status, status);
+      assert.equal(response.body.code, code);
+      assert.ok(!ran(statements, 'INSERT INTO'));
+      assert.ok(!ran(statements, 'pin_hash'));
+      assert.equal(statements.at(-1).sql, 'ROLLBACK');
+    });
+  }
+
+  test('refuses an unknown request', async () => {
+    const { response } = await payRequest(crypto.randomUUID());
+    assert.equal(response.status, 404);
+    assert.equal(response.body.code, 'REQUEST_NOT_FOUND');
   });
 });

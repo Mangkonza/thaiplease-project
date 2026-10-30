@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import api, { getErrorMessage } from '../api';
 import PinPad from '../components/PinPad';
 import { formatBaht } from '../utils/format';
@@ -22,6 +22,7 @@ export default function WalletPage() {
   const [pinError, setPinError] = useState('');
   const [pinAttempt, setPinAttempt] = useState(0);
   const pins = useRef({ current: '', next: '' });
+  const { hash } = useLocation();
 
   function load() {
     return api.get('/users/me/wallet')
@@ -30,6 +31,12 @@ export default function WalletPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  // ปุ่มเติมเงินในหน้าแรกพามาที่ /wallet#topup ต้องเลื่อนเองเพราะฟอร์มแสดงหลังโหลดข้อมูลเสร็จ
+  const loaded = wallet !== null;
+  useEffect(() => {
+    if (loaded && hash === '#topup') document.getElementById('topup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [loaded, hash]);
 
   async function topUp(event) {
     event.preventDefault();
@@ -92,13 +99,12 @@ export default function WalletPage() {
         <span className="eyebrow">G-WALLET (จำลอง)</span>
         <p>ยอดเงินคงเหลือ</p>
         <strong>{formatBaht(wallet.balance)}</strong>
-        <Link className="button button-light" to="/scan">สแกนจ่าย</Link>
       </section>
 
       {error && <p className="notice notice-error" role="alert">{error}</p>}
       {notice && <p className="notice notice-success" role="status">{notice}</p>}
 
-      <form className="card form-stack" onSubmit={topUp}>
+      <form id="topup" className="card form-stack" onSubmit={topUp}>
         <span className="eyebrow">TOP UP</span>
         <h2>เติมเงิน</h2>
         <p className="muted">เติมเงินแบบจำลอง ไม่มีการตัดเงินจากบัญชีธนาคารจริง ครั้งละไม่เกิน {formatBaht(wallet.max_topup)}</p>

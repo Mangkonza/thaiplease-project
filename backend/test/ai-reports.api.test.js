@@ -46,6 +46,7 @@ function mockDatabase({ owner = OWNER_ID, current = metricsRow(12, 1), previous 
     }
     if (sql.includes('FROM ai_suggestions g')) return { rows: state.suggestions };
     if (sql.startsWith('SELECT * FROM shops WHERE status')) return { rows: [{ shop_id: SHOP_ID, name: 'ร้านกาแฟบ้านสวน' }] };
+    if (sql.includes('FROM shop_menu_items')) return { rows: [] };
     throw new Error(`Unexpected query in test: ${sql.slice(0, 80)}`);
   });
 

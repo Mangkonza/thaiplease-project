@@ -1,5 +1,6 @@
 const db = require('../../config/db');
 const { UUID_PATTERN } = require('../../middlewares/shop.middleware');
+const { attachMenuPreview, getMenuItems } = require('./shop-details');
 
 // Public storefront view is limited to approved shops; the existing owner endpoint remains protected.
 const getPublicShopById = async (req, res) => {
@@ -9,14 +10,15 @@ const getPublicShopById = async (req, res) => {
   }
   try {
     const result = await db.query(
-      `SELECT shop_id, name, category, area, description, status, image_path
+      `SELECT shop_id, name, category, area, description, status, image_path,
+              address, opening_hours, latitude, longitude
        FROM shops WHERE shop_id = $1 AND status = 'ACTIVE'`,
       [shopId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Shop not found' });
     }
-    return res.json({ success: true, shop: result.rows[0] });
+    return res.json({ success: true, shop: { ...result.rows[0], menu_items: await getMenuItems(shopId) } });
   } catch (error) {
     console.error('Get public shop error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
@@ -70,7 +72,7 @@ const getShopById = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      shop: result.rows[0],
+      shop: { ...result.rows[0], menu_items: await getMenuItems(shopId) },
     });
   } catch (error) {
     console.error('Get shop by ID error:', error);
@@ -248,10 +250,11 @@ const getAllShops = async (req, res) => {
       queryParams.push(search.trim());
       searchParamIdx = queryParams.length;
 
-      // ค้นหาทั้งแบบตรงตัว (ILIKE) และแบบคล้ายคลึง (similarity > 0.25)
+      // ค้นหาทั้งแบบตรงตัว (ILIKE) และแบบคล้ายคลึง (similarity > 0.25) รวมถึงชื่อสินค้าที่ร้านขาย
       queryText += ` AND (
         name ILIKE '%' || $${searchParamIdx} || '%'
         OR description ILIKE '%' || $${searchParamIdx} || '%'
+        OR EXISTS (SELECT 1 FROM shop_menu_items m WHERE m.shop_id = shops.shop_id AND m.name ILIKE '%' || $${searchParamIdx} || '%')
         OR similarity(name, $${searchParamIdx}) > 0.25
         OR similarity(COALESCE(description, ''), $${searchParamIdx}) > 0.20
       )`;
@@ -278,11 +281,12 @@ const getAllShops = async (req, res) => {
     }
 
     const result = await db.query(queryText, queryParams);
+    const shops = await attachMenuPreview(result.rows);
 
     return res.status(200).json({
       success: true,
-      total: result.rows.length,
-      shops: result.rows,
+      total: shops.length,
+      shops,
     });
   } catch (error) {
     console.error('Get all shops error:', error);

@@ -51,4 +51,22 @@ function paymentAccountRows(sql, { balance = 100000, pinHash = TEST_PIN_HASH } =
   return null;
 }
 
-module.exports = { db, startServer, signToken, TEST_PIN, TEST_PIN_HASH, paymentAccountRows };
+// คำขอรับเงินที่ร้านสร้างไว้ (แบบไทยพลัส): test ขอ id ของคำขอที่มียอดตามต้องการ แล้ว mock ตอบแถวด้วย paymentRequestRows
+const paymentRequests = new Map();
+function paymentRequestFor(shopId, amount, overrides = {}) {
+  const requestId = crypto.randomUUID();
+  paymentRequests.set(requestId, {
+    request_id: requestId, shop_id: shopId, amount: String(amount), status: 'PENDING',
+    expires_at: new Date(Date.now() + 60_000), payment_id: null, ...overrides,
+  });
+  return requestId;
+}
+function paymentRequestRows(sql, params = []) {
+  if (!sql.includes('FROM payment_requests WHERE request_id')) return null;
+  const row = paymentRequests.get(params[0]);
+  return { rows: row ? [row] : [] };
+}
+
+module.exports = {
+  db, startServer, signToken, TEST_PIN, TEST_PIN_HASH, paymentAccountRows, paymentRequestFor, paymentRequestRows,
+};
