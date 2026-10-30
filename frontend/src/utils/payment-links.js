@@ -1,13 +1,13 @@
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const PAY_PATH = new RegExp(`^/pay/(${UUID})/?$`, 'i');
 
-// ข้อความใน QR รับเงินของร้าน: ลิงก์ /pay/<shopId> บนเว็บนี้
-export function buildPayUrl(origin, shopId) {
-  return `${origin}/pay/${shopId}`;
+// ข้อความใน QR รับเงิน: ลิงก์ /pay/<requestId> ของคำขอรับเงินที่ร้านใส่ยอดไว้ (ใช้ได้ 5 นาที)
+export function buildPayUrl(origin, requestId) {
+  return `${origin}/pay/${requestId}`;
 }
 
-// อ่าน shopId จากข้อความที่สแกนได้ ยอมรับทุก origin เพราะเครื่องที่สร้าง QR อาจเปิดเว็บด้วยที่อยู่ต่างจากเครื่องที่สแกน
-export function parseShopIdFromQr(text) {
+// อ่าน id ของคำขอรับเงินจากข้อความที่สแกนได้ ยอมรับทุก origin เพราะเครื่องที่สร้าง QR อาจเปิดเว็บด้วยที่อยู่ต่างจากเครื่องที่สแกน
+export function parsePaymentRequestIdFromQr(text) {
   if (typeof text !== 'string') return null;
   let url;
   try {
@@ -25,7 +25,7 @@ export function homePathFor(user) {
   if (!user) return '/login';
   if (user.role === 'MERCHANT') return '/merchant/shops';
   if (user.role === 'ADMIN') return '/admin/shops';
-  return '/shops';
+  return '/home';
 }
 
 // รูปถูกเสิร์ฟจาก backend ที่ /uploads ซึ่งตอนพัฒนาอยู่คนละ origin กับหน้าเว็บ

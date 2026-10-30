@@ -4,8 +4,18 @@ import api, { getErrorMessage, imageSrc } from '../api';
 import PinPad from '../components/PinPad';
 import { formatBaht, subsidyStatusText } from '../utils/format';
 import { walletErrorMessage } from '../utils/wallet';
+import { clockOffset, formatCountdown } from '../utils/countdown';
+import useCountdown from '../hooks/useCountdown';
 
-const QUOTE_DELAY_MS = 400;
+// ข้อความเมื่อคำขอรับเงินจ่ายไม่ได้แล้ว (code จาก backend)
+const REQUEST_ERRORS = {
+  REQUEST_EXPIRED: 'QR นี้หมดเวลาแล้ว (ใช้ได้ 5 นาที) ขอให้ร้านสร้าง QR ใหม่',
+  REQUEST_ALREADY_PAID: 'QR นี้ถูกใช้จ่ายไปแล้ว',
+  REQUEST_CANCELLED: 'ร้านยกเลิก QR นี้แล้ว',
+  REQUEST_NOT_FOUND: 'ไม่พบ QR นี้ในระบบ ThaiPlease',
+};
+const STATE_ERRORS = { EXPIRED: REQUEST_ERRORS.REQUEST_EXPIRED, PAID: REQUEST_ERRORS.REQUEST_ALREADY_PAID, CANCELLED: REQUEST_ERRORS.REQUEST_CANCELLED };
+const requestErrorText = (requestError) => REQUEST_ERRORS[requestError.response?.data?.code] || getErrorMessage(requestError);
 
 function Breakdown({ data }) {
   return (
@@ -26,12 +36,12 @@ const PIN_STEPS = {
 };
 
 export default function CheckoutPage() {
-  const { shopId } = useParams();
+  const { requestId } = useParams();
   const navigate = useNavigate();
-  const [shop, setShop] = useState(null);
+  // คำขอรับเงินที่ร้านใส่ยอดไว้ พร้อมส่วนต่างนาฬิกา server สำหรับนับถอยหลัง
+  const [payRequest, setPayRequest] = useState(null);
   const [wallet, setWallet] = useState(null);
-  const [amount, setAmount] = useState('');
-  // ผลคำนวณล่าสุด (quote หรือ error) ผูกกับยอดและคูปองที่ใช้ขอ เพื่อไม่แสดงผลของค่าที่ผู้ใช้เปลี่ยนไปแล้ว
+  // ผลคำนวณล่าสุด (quote หรือ error) ผูกกับคูปองที่ใช้ขอ เพื่อไม่แสดงผลของคูปองที่ผู้ใช้เปลี่ยนไปแล้ว
   const [quoteResult, setQuoteResult] = useState(null);
   const [coupons, setCoupons] = useState([]);
   const [couponId, setCouponId] = useState('');
@@ -41,40 +51,45 @@ export default function CheckoutPage() {
   const [pinError, setPinError] = useState('');
   const [pinAttempt, setPinAttempt] = useState(0);
   const newPin = useRef('');
-  // ใช้ key เดิมเมื่อกดซ้ำหรือ retry ยอดเดิม เพื่อให้ backend กันการตัดเงินซ้ำได้ เปลี่ยน key เมื่อยอดเปลี่ยน
+  // ใช้ key เดิมตลอดหน้านี้ ถ้ากดซ้ำหรือ retry backend จะคืนรายการเดิมแทนการตัดเงินซ้ำ
   const requestKey = useRef(crypto.randomUUID());
-
-  const value = Number(amount);
-  const validAmount = amount !== '' && Number.isFinite(value) && value > 0;
+  const shop = payRequest?.shop;
+  const shopId = payRequest?.shop_id;
+  const payable = payRequest?.status === 'PENDING';
+  const secondsLeft = useCountdown(payable ? payRequest.expires_at : null, payRequest?.offset || 0);
+  const expired = payable && secondsLeft === 0;
+  const unpayable = payRequest && !payable ? STATE_ERRORS[payRequest.status] : expired ? REQUEST_ERRORS.REQUEST_EXPIRED : '';
 
   useEffect(() => {
-    api.get(`/shops/public/${shopId}`)
-      .then(({ data }) => setShop(data.shop))
-      .catch((requestError) => setError(requestError.response?.status === 404 ? 'ไม่พบร้านนี้ หรือร้านยังไม่เปิดให้บริการ' : getErrorMessage(requestError)));
+    const fetchedAt = Date.now();
+    api.get(`/payment-requests/${requestId}`)
+      .then(({ data }) => setPayRequest({ ...data.request, offset: clockOffset(data.request.server_time, fetchedAt) }))
+      .catch((requestError) => setError(requestErrorText(requestError)));
+    api.get('/users/me/wallet')
+      .then(({ data }) => setWallet(data))
+      .catch((requestError) => setError(getErrorMessage(requestError)));
+  }, [requestId]);
+
+  useEffect(() => {
+    if (!shopId) return;
     api.get('/users/me/coupons')
       // คูปองจากภารกิจใช้ได้เฉพาะร้านที่กำหนด จึงแสดงเฉพาะคูปองที่ใช้ที่ร้านนี้ได้
       .then(({ data }) => setCoupons(data.coupons.filter((coupon) => coupon.status === 'ACTIVE' && (!coupon.shop_id || coupon.shop_id === shopId))))
       .catch((requestError) => setError(getErrorMessage(requestError)));
-    api.get('/users/me/wallet')
-      .then(({ data }) => setWallet(data))
-      .catch((requestError) => setError(getErrorMessage(requestError)));
   }, [shopId]);
 
   useEffect(() => {
-    requestKey.current = crypto.randomUUID();
-    if (!validAmount) return undefined;
+    if (!payable) return undefined;
     let cancelled = false;
-    const timer = setTimeout(() => {
-      api.post('/payments/quote', { shop_id: shopId, gross_amount: value, coupon_id: couponId || null })
-        .then(({ data }) => { if (!cancelled) setQuoteResult({ value, couponId, quote: data.quote }); })
-        .catch((requestError) => {
-          if (!cancelled) setQuoteResult({ value, couponId, error: getErrorMessage(requestError) });
-        });
-    }, QUOTE_DELAY_MS);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [shopId, value, validAmount, couponId]);
+    api.post('/payments/quote', { payment_request_id: requestId, coupon_id: couponId || null })
+      .then(({ data }) => { if (!cancelled) setQuoteResult({ couponId, quote: data.quote }); })
+      .catch((requestError) => {
+        if (!cancelled) setQuoteResult({ couponId, error: requestErrorText(requestError) });
+      });
+    return () => { cancelled = true; };
+  }, [requestId, payable, couponId]);
 
-  const currentResult = validAmount && quoteResult && quoteResult.value === value && quoteResult.couponId === couponId ? quoteResult : null;
+  const currentResult = quoteResult && quoteResult.couponId === couponId ? quoteResult : null;
   const shownQuote = currentResult && currentResult.quote;
   const quoteError = currentResult && currentResult.error;
   const note = shownQuote && subsidyStatusText(shownQuote.subsidy_status);
@@ -125,8 +140,7 @@ export default function CheckoutPage() {
     setBusy(true);
     try {
       const { data } = await api.post('/payments', {
-        shop_id: shopId,
-        gross_amount: value,
+        payment_request_id: requestId,
         coupon_id: couponId || null,
         request_key: requestKey.current,
         pin,
@@ -144,7 +158,7 @@ export default function CheckoutPage() {
       });
     } catch (requestError) {
       const body = requestError.response?.data;
-      const message = walletErrorMessage(body, getErrorMessage(requestError));
+      const message = REQUEST_ERRORS[body?.code] || walletErrorMessage(body, getErrorMessage(requestError));
       if (body?.code === 'PIN_INCORRECT') {
         setPinError(message);
         setPinAttempt((n) => n + 1);
@@ -171,19 +185,24 @@ export default function CheckoutPage() {
             <div><strong>{shop.name}</strong><small className="muted">{shop.area || 'ร้านค้าในชุมชน'}</small></div>
           </div>
         )}
-        <p className="muted">ระบุยอดซื้อ ระบบจะคิดส่วนลดแคมเปญ คูปอง และส่วนที่รัฐช่วยจ่ายให้อัตโนมัติ แล้วหักส่วนที่คุณจ่ายจากกระเป๋าเงิน</p>
+        <p className="muted">ร้านใส่ยอดไว้แล้ว ระบบคิดส่วนลดแคมเปญ คูปอง และส่วนที่รัฐช่วยจ่ายให้อัตโนมัติ แล้วหักส่วนที่คุณจ่ายจากกระเป๋าเงิน</p>
       </div>
       <form className="card checkout-card" onSubmit={openPin}>
         {wallet && <div className="wallet-strip"><span>ยอดเงินในกระเป๋า</span><strong>{formatBaht(wallet.balance)}</strong><Link to="/wallet">เติมเงิน</Link></div>}
-        <label>ยอดซื้อ (บาท)<input type="number" min="0.01" step="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="เช่น 250.00" /></label>
+        {payRequest && <div className="locked-amount">
+          <span>ยอดที่ร้านเรียกเก็บ</span>
+          <strong>{formatBaht(payRequest.amount)}</strong>
+          {payable && <small className={secondsLeft <= 60 ? 'countdown urgent' : 'countdown'}>{expired ? 'หมดเวลาแล้ว' : `QR หมดอายุใน ${formatCountdown(secondsLeft)}`}</small>}
+        </div>}
+        {unpayable && <p className="notice notice-error" role="alert">{unpayable}</p>}
         {coupons.length > 0 && <label>คูปอง<select value={couponId} onChange={(event) => setCouponId(event.target.value)}><option value="">ไม่ใช้คูปอง</option>{coupons.map((coupon) => <option key={coupon.coupon_id} value={coupon.coupon_id}>ลด {formatBaht(coupon.value)}{coupon.shop_id ? ' (คูปองร้านนี้)' : ''} (ขั้นต่ำ {formatBaht(coupon.min_spend)}, ใช้ได้ถึง {new Date(coupon.expires_at).toLocaleDateString('th-TH')})</option>)}</select></label>}
-        {shownQuote && <><Breakdown data={shownQuote} />
+        {shownQuote && !unpayable && <><Breakdown data={shownQuote} />
           <div className="coin-preview">ยอดนี้จะได้รับ <strong>{shownQuote.coins_estimate} coin</strong>{shownQuote.subsidy_remaining && <> · สิทธิ์รัฐช่วยจ่ายคงเหลือวันนี้หลังจ่าย {formatBaht(shownQuote.subsidy_remaining.today)}</>}</div></>}
         {note && <p className="notice">{note}</p>}
         {notEnough && <p className="notice notice-error" role="alert">ยอดเงินในกระเป๋าไม่พอ ต้องจ่าย {formatBaht(shownQuote.citizen_paid)} <Link to="/wallet">ไปเติมเงิน</Link></p>}
         {quoteError && <p className="notice notice-error" role="alert">{quoteError}</p>}
         {error && <p className="notice notice-error" role="alert">{error}</p>}
-        <button className="button button-primary button-wide" disabled={busy || !shownQuote || notEnough || !shop}>{shownQuote ? `ยืนยันจ่าย ${formatBaht(shownQuote.citizen_paid)}` : 'ระบุยอดซื้อ'}</button>
+        <button className="button button-primary button-wide" disabled={busy || !shownQuote || notEnough || Boolean(unpayable)}>{shownQuote && !unpayable ? `ยืนยันจ่าย ${formatBaht(shownQuote.citizen_paid)}` : 'จ่ายไม่ได้'}</button>
         <p className="fine-print">ระบบนี้ใช้สำหรับชำระเงินจำลอง ไม่เรียกเก็บเงินจริง</p>
       </form>
       {pinStep && (

@@ -1,6 +1,8 @@
-import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Coins, House, ShieldCheck, Store, Wallet } from 'lucide-react';
 import { useAuth } from './auth-context';
 import AuthPage from './pages/AuthPage';
+import HomePage from './pages/HomePage';
 import ShopsPage from './pages/ShopsPage';
 import ShopPage from './pages/ShopPage';
 import CheckoutPage from './pages/CheckoutPage';
@@ -33,16 +35,17 @@ function LoginRoute() {
   return user ? <Navigate to={from || homePathFor(user)} replace /> : <AuthPage />;
 }
 
-// ลิงก์ใน QR รับเงินของร้าน พาไปหน้าจ่ายเงินของร้านนั้น
+// ลิงก์ใน QR รับเงิน พาไปหน้าจ่ายคำขอรับเงินที่ร้านใส่ยอดไว้
 function PayLink() {
-  const { shopId } = useParams();
-  return <Navigate to={`/checkout/${shopId}`} replace />;
+  const { requestId } = useParams();
+  return <Navigate to={`/checkout/${requestId}`} replace />;
 }
 
+// สแกนจ่ายและเติมเงินอยู่บนการ์ดกระเป๋าเงินในหน้าแรก จึงไม่อยู่ในเมนู
 const NAV_LINKS = {
-  CITIZEN: [['/shops', 'ค้นหาร้าน'], ['/scan', 'สแกนจ่าย'], ['/wallet', 'กระเป๋าเงิน'], ['/coins', 'เหรียญของฉัน']],
-  MERCHANT: [['/merchant/shops', 'จัดการร้าน']],
-  ADMIN: [['/admin/shops', 'ผู้ดูแลระบบ']],
+  CITIZEN: [['/home', 'หน้าแรก', House], ['/shops', 'ร้านแนะนำ', Store], ['/wallet', 'กระเป๋าเงิน', Wallet], ['/coins', 'เหรียญของฉัน', Coins]],
+  MERCHANT: [['/merchant/shops', 'จัดการร้าน', Store]],
+  ADMIN: [['/admin/shops', 'ผู้ดูแลระบบ', ShieldCheck]],
 };
 
 export default function App() {
@@ -57,11 +60,11 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={user?.role === 'CITIZEN' ? 'app-shell has-tabbar' : 'app-shell'}>
       <header className="topbar">
         <Link className="brand" to={homePathFor(user)}><span className="brand-mark">ท</span> ThaiPlease</Link>
         <nav className="nav-links">
-          {(NAV_LINKS[user?.role] || []).map(([to, label]) => <Link key={to} to={to}>{label}</Link>)}
+          {(NAV_LINKS[user?.role] || []).map(([to, label, Icon]) => <NavLink key={to} to={to}><Icon size={16} />{label}</NavLink>)}
         </nav>
         <div className="account-actions">
           {user ? (
@@ -76,11 +79,12 @@ export default function App() {
       <main className="page-wrap">
         <Routes>
           <Route path="/" element={<Navigate to={homePathFor(user)} replace />} />
+          <Route path="/home" element={citizen(<HomePage />)} />
           <Route path="/shops" element={citizen(<ShopsPage />)} />
           <Route path="/shops/:shopId" element={citizen(<ShopPage />)} />
           <Route path="/scan" element={citizen(<ScanPage />)} />
-          <Route path="/pay/:shopId" element={citizen(<PayLink />)} />
-          <Route path="/checkout/:shopId" element={citizen(<CheckoutPage />)} />
+          <Route path="/pay/:requestId" element={citizen(<PayLink />)} />
+          <Route path="/checkout/:requestId" element={citizen(<CheckoutPage />)} />
           <Route path="/wallet" element={citizen(<WalletPage />)} />
           <Route path="/slips/:paymentId" element={citizen(<SlipPage />)} />
           <Route path="/coins" element={citizen(<CoinsPage />)} />

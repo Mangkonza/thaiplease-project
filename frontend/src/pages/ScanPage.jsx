@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
-import api, { getErrorMessage } from '../api';
-import { parseShopIdFromQr } from '../utils/payment-links';
+import { parsePaymentRequestIdFromQr } from '../utils/payment-links';
 
 const NOT_OUR_QR = 'QR นี้ไม่ใช่ QR รับเงินของร้านในระบบ ThaiPlease';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function decodeCanvas(canvas, source, width, height) {
   canvas.width = width;
@@ -21,17 +21,7 @@ export default function ScanPage() {
   const canvasRef = useRef(null);
   const [cameraOn, setCameraOn] = useState(false);
   const [error, setError] = useState('');
-  const [shops, setShops] = useState([]);
-  const [mockShopId, setMockShopId] = useState('');
-
-  useEffect(() => {
-    api.get('/shops')
-      .then(({ data }) => {
-        setShops(data.shops);
-        setMockShopId(data.shops[0]?.shop_id || '');
-      })
-      .catch((requestError) => setError(getErrorMessage(requestError)));
-  }, []);
+  const [pasted, setPasted] = useState('');
 
   // อ่าน QR จากกล้องทีละเฟรมจนเจอ แล้วปิดกล้องเมื่อออกจากหน้าหรือกดหยุด
   useEffect(() => {
@@ -45,9 +35,9 @@ export default function ScanPage() {
       if (video.readyState === video.HAVE_ENOUGH_DATA) {
         const text = decodeCanvas(canvasRef.current, video, video.videoWidth, video.videoHeight);
         if (text) {
-          const shopId = parseShopIdFromQr(text);
-          if (shopId) {
-            navigate(`/checkout/${shopId}`);
+          const requestId = parsePaymentRequestIdFromQr(text);
+          if (requestId) {
+            navigate(`/checkout/${requestId}`);
             return;
           }
           setError(NOT_OUR_QR);
@@ -86,8 +76,8 @@ export default function ScanPage() {
     image.onload = () => {
       URL.revokeObjectURL(url);
       const text = decodeCanvas(canvasRef.current, image, image.naturalWidth, image.naturalHeight);
-      const shopId = parseShopIdFromQr(text);
-      if (shopId) navigate(`/checkout/${shopId}`);
+      const requestId = parsePaymentRequestIdFromQr(text);
+      if (requestId) navigate(`/checkout/${requestId}`);
       else setError(text ? NOT_OUR_QR : 'ไม่พบ QR ในรูปนี้ ลองใช้รูปที่เห็น QR ชัดๆ');
     };
     image.onerror = () => {
@@ -97,9 +87,18 @@ export default function ScanPage() {
     image.src = url;
   }
 
+  // demo บนเครื่องเดียว: วางลิงก์ใต้ QR ในหน้ารับเงินของร้านแทนการสแกน
+  function openPasted(event) {
+    event.preventDefault();
+    const text = pasted.trim();
+    const requestId = parsePaymentRequestIdFromQr(text) || (UUID.test(text) ? text.toLowerCase() : null);
+    if (requestId) navigate(`/checkout/${requestId}`);
+    else setError(NOT_OUR_QR);
+  }
+
   return (
     <div className="content-stack narrow-page">
-      <div><span className="eyebrow">SCAN TO PAY</span><h1>สแกนจ่าย</h1><p className="muted">สแกน QR รับเงินที่หน้าร้าน แล้วระบุยอดซื้อ</p></div>
+      <div><span className="eyebrow">SCAN TO PAY</span><h1>สแกนจ่าย</h1><p className="muted">สแกน QR ที่ร้านสร้างให้ ยอดเงินมาจากร้าน คุณแค่ตรวจยอดแล้วใส่ PIN (QR ใช้ได้ 5 นาที)</p></div>
       {error && <p className="notice notice-error" role="alert">{error}</p>}
 
       <section className="card scan-card">
@@ -117,17 +116,13 @@ export default function ScanPage() {
         </div>
       </section>
 
-      <section className="card form-stack">
+      <form className="card form-stack" onSubmit={openPasted}>
         <span className="eyebrow">DEMO</span>
         <h2>จำลองการสแกน</h2>
-        <p className="muted">สำหรับทดสอบเมื่อไม่มีกล้องหรือไม่มี QR ของร้าน: เลือกร้านแล้วไปหน้าจ่ายเงินเหมือนสแกนสำเร็จ</p>
-        <label>ร้านค้า
-          <select value={mockShopId} onChange={(event) => setMockShopId(event.target.value)}>
-            {shops.map((shop) => <option key={shop.shop_id} value={shop.shop_id}>{shop.name}</option>)}
-          </select>
-        </label>
-        <button className="button button-outline" type="button" disabled={!mockShopId} onClick={() => navigate(`/checkout/${mockShopId}`)}>จำลองสแกนร้านนี้</button>
-      </section>
+        <p className="muted">สำหรับทดสอบเมื่อไม่มีกล้อง: คัดลอกลิงก์ใต้ QR ในหน้ารับเงินของร้านมาวางที่นี่</p>
+        <label>ลิงก์ QR รับเงิน<input value={pasted} onChange={(event) => setPasted(event.target.value)} placeholder="http://…/pay/…" /></label>
+        <button className="button button-outline" disabled={!pasted.trim()}>เปิดหน้าจ่ายเงิน</button>
+      </form>
     </div>
   );
 }
