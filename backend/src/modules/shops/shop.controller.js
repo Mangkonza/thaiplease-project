@@ -1,6 +1,78 @@
+const crypto = require('node:crypto');
+const jwt = require('jsonwebtoken');
 const db = require('../../config/db');
 const { UUID_PATTERN } = require('../../middlewares/shop.middleware');
 const { attachMenuPreview, getMenuItems } = require('./shop-details');
+
+function getAuthenticatedCitizen(req) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return null;
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return decoded && decoded.role === 'CITIZEN' ? decoded : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function formatCampaignBenefit(mechanic, params, defaultName) {
+  if (!params) return defaultName;
+  switch (mechanic) {
+    case 'PERCENT_DISCOUNT':
+    case 'TIME_BASED':
+    case 'DAY_BASED':
+    case 'NEW_CUSTOMER':
+      return params.discount_percent ? `ลด ${params.discount_percent}%` : defaultName;
+    case 'FIXED_DISCOUNT':
+    case 'COMEBACK_REWARD':
+      return params.discount_amount ? `ลด ${params.discount_amount} บาท` : defaultName;
+    case 'BONUS_COIN':
+      return params.bonus_coin ? `รับเหรียญเพิ่ม +${params.bonus_coin}` : defaultName;
+    case 'COIN_MULTIPLIER':
+      return params.multiplier ? `รับเหรียญ x${params.multiplier}` : defaultName;
+    case 'MIN_SPEND_REWARD':
+      return params.reward_value ? `ลด ${params.reward_value} บาท` : defaultName;
+    case 'FREQUENCY_REWARD':
+      return params.reward_coins ? `รับเหรียญ +${params.reward_coins}` : defaultName;
+    default:
+      return defaultName;
+  }
+}
+
+function formatCampaignInstruction(mechanic, params) {
+  if (!params) return 'สแกน QR และชำระเงินที่ร้านเพื่อรับสิทธิ์โปรโมชันอัตโนมัติ';
+  switch (mechanic) {
+    case 'PERCENT_DISCOUNT': {
+      const min = params.min_spend ? `มียอดซื้อตั้งแต่ ${params.min_spend} บาทขึ้นไป` : 'ไม่กำหนดยอดซื้อขั้นต่ำ';
+      return `เมื่อสแกนจ่ายที่ร้านและ${min} ระบบจะคิดส่วนลดให้ทันที ${params.discount_percent}% ในส่วนที่คุณจ่าย`;
+    }
+    case 'FIXED_DISCOUNT': {
+      const min = params.min_spend ? `มียอดซื้อตั้งแต่ ${params.min_spend} บาทขึ้นไป` : 'ไม่กำหนดยอดซื้อขั้นต่ำ';
+      return `เมื่อสแกนจ่ายที่ร้านและ${min} ระบบจะลดค่าใช้จ่ายทันที ${params.discount_amount} บาท ในส่วนที่คุณจ่าย`;
+    }
+    case 'BONUS_COIN': {
+      const min = params.min_spend ? `มียอดซื้อตั้งแต่ ${params.min_spend} บาทขึ้นไป` : 'ไม่กำหนดยอดซื้อขั้นต่ำ';
+      return `เมื่อสแกนจ่ายที่ร้านและ${min} รับเหรียญโบนัสพิเศษเพิ่มทันที ${params.bonus_coin} coin`;
+    }
+    case 'COIN_MULTIPLIER':
+      return `เมื่อสแกนจ่ายที่ร้าน รับเหรียญสะสมเพิ่มทันที ${params.multiplier} เท่าจากยอดปกติ`;
+    case 'MIN_SPEND_REWARD':
+      return `เมื่อสแกนจ่ายที่ร้านโดยมียอดซื้อตั้งแต่ ${params.min_spend} บาทขึ้นไป รับส่วนลดทันที ${params.reward_value} บาท`;
+    case 'COMEBACK_REWARD':
+      return `สิทธิพิเศษสำหรับลูกค้าที่ไม่ได้มาซื้อเกิน ${params.inactive_days} วัน รับส่วนลด ${params.discount_amount} บาท เมื่อสแกนจ่าย`;
+    case 'FREQUENCY_REWARD':
+      return `สะสมการซื้อที่ร้านครบทุกๆ ${params.required_orders} ครั้ง รับเหรียญรางวัลพิเศษ ${params.reward_coins} coin`;
+    case 'TIME_BASED':
+      return `สแกนจ่ายในช่วงเวลาพิเศษ ${params.start_time} - ${params.end_time} น. รับส่วนลดทันที ${params.discount_percent}%`;
+    case 'DAY_BASED':
+      return `สแกนจ่ายในวันที่กำหนด (${(params.target_days || []).join(', ')}) รับส่วนลดทันที ${params.discount_percent}%`;
+    case 'NEW_CUSTOMER':
+      return `สำหรับลูกค้าใหม่ที่ยังไม่เคยใช้จ่ายที่ร้านนี้ รับส่วนลดพิเศษทันที ${params.discount_percent}% เมื่อสแกนจ่ายครั้งแรก`;
+    default:
+      return 'สแกน QR และชำระเงินที่ร้านเพื่อรับสิทธิ์โปรโมชันอัตโนมัติ';
+  }
+}
 
 // Public storefront view is limited to approved shops; the existing owner endpoint remains protected.
 const getPublicShopById = async (req, res) => {
@@ -18,7 +90,61 @@ const getPublicShopById = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Shop not found' });
     }
-    return res.json({ success: true, shop: { ...result.rows[0], menu_items: await getMenuItems(shopId) } });
+
+    let activeCampaign = null;
+    const citizen = getAuthenticatedCitizen(req);
+    if (citizen) {
+      const now = new Date();
+      const campaignResult = await db.query(
+        `SELECT c.campaign_id, c.shop_id, c.name AS campaign_name, c.parameters, c.treatment_ratio,
+                c.start_at, c.end_at,
+                t.name AS template_name, t.mechanic AS template_code,
+                a.group_type
+         FROM campaigns c
+         JOIN promotion_templates t ON t.template_id = c.template_id
+         LEFT JOIN campaign_assignments a ON a.campaign_id = c.campaign_id AND a.user_id = $2
+         WHERE c.shop_id = $1 AND c.status = 'ACTIVE'
+           AND c.start_at <= $3 AND c.end_at >= $3
+         ORDER BY c.activated_at DESC
+         LIMIT 1`,
+        [shopId, citizen.user_id, now]
+      );
+      if (campaignResult.rows.length) {
+        const row = campaignResult.rows[0];
+        let isEligible = false;
+        if (row.group_type === 'TREATMENT') {
+          isEligible = true;
+        } else if (!row.group_type) {
+          const hash = crypto.createHash('sha256').update(`${citizen.user_id}${row.campaign_id}`).digest();
+          const value = hash.readUInt32BE(0) / 0x100000000;
+          if (value < Number(row.treatment_ratio || 0.5)) {
+            isEligible = true;
+          }
+        }
+        if (isEligible) {
+          activeCampaign = {
+            campaign_id: row.campaign_id,
+            name: row.campaign_name,
+            template_code: row.template_code,
+            template_name: row.template_name,
+            parameters: row.parameters,
+            start_at: row.start_at,
+            end_at: row.end_at,
+            benefit_text: formatCampaignBenefit(row.template_code, row.parameters, row.campaign_name),
+            instruction_text: formatCampaignInstruction(row.template_code, row.parameters),
+          };
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      shop: {
+        ...result.rows[0],
+        menu_items: await getMenuItems(shopId),
+        active_campaign: activeCampaign,
+      },
+    });
   } catch (error) {
     console.error('Get public shop error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
@@ -27,7 +153,7 @@ const getPublicShopById = async (req, res) => {
 
 // POST /api/v1/shops (สร้างร้านค้าใหม่โดย Merchant; ร้านใหม่ต้องรอ Admin อนุมัติก่อนเป็น ACTIVE)
 const createShop = async (req, res) => {
-  const { name, category, area, description } = req.body;
+  const { name, category, area, description, menu_items } = req.body;
   const owner_id = req.user.user_id;
 
   if (!name) {
@@ -41,11 +167,25 @@ const createShop = async (req, res) => {
        RETURNING *`,
       [owner_id, name, category || null, area || null, description || null]
     );
+    const shop = result.rows[0];
+
+    if (Array.isArray(menu_items) && menu_items.length > 0) {
+      for (const [index, item] of menu_items.entries()) {
+        const itemName = typeof item?.name === 'string' ? item.name.trim() : '';
+        if (itemName) {
+          const itemPrice = item?.price !== undefined && item?.price !== null && item?.price !== '' ? Number(item.price) : null;
+          await db.query(
+            'INSERT INTO shop_menu_items (shop_id, name, price, sort_order) VALUES ($1, $2, $3, $4)',
+            [shop.shop_id, itemName, itemPrice, index]
+          );
+        }
+      }
+    }
 
     return res.status(201).json({
       success: true,
       message: 'Shop created and pending admin approval',
-      shop: result.rows[0],
+      shop,
     });
   } catch (error) {
     console.error('Create shop error:', error);
@@ -283,10 +423,68 @@ const getAllShops = async (req, res) => {
     const result = await db.query(queryText, queryParams);
     const shops = await attachMenuPreview(result.rows);
 
+    let userCampaignsByShop = new Map();
+    const citizen = getAuthenticatedCitizen(req);
+    if (citizen) {
+      const now = new Date();
+      const campaignResult = await db.query(
+        `SELECT c.campaign_id, c.shop_id, c.name AS campaign_name, c.parameters, c.treatment_ratio,
+                t.name AS template_name, t.mechanic AS template_code,
+                a.group_type
+         FROM campaigns c
+         JOIN promotion_templates t ON t.template_id = c.template_id
+         LEFT JOIN campaign_assignments a ON a.campaign_id = c.campaign_id AND a.user_id = $1
+         WHERE c.status = 'ACTIVE'
+           AND c.start_at <= $2 AND c.end_at >= $2
+         ORDER BY c.activated_at DESC`,
+        [citizen.user_id, now]
+      );
+
+      for (const row of campaignResult.rows) {
+        if (userCampaignsByShop.has(row.shop_id)) continue;
+        let isEligible = false;
+        if (row.group_type === 'TREATMENT') {
+          isEligible = true;
+        } else if (!row.group_type) {
+          const hash = crypto.createHash('sha256').update(`${citizen.user_id}${row.campaign_id}`).digest();
+          const value = hash.readUInt32BE(0) / 0x100000000;
+          if (value < Number(row.treatment_ratio || 0.5)) {
+            isEligible = true;
+          }
+        }
+        if (isEligible) {
+          userCampaignsByShop.set(row.shop_id, {
+            campaign_id: row.campaign_id,
+            name: row.campaign_name,
+            template_code: row.template_code,
+            template_name: row.template_name,
+            parameters: row.parameters,
+            benefit_text: formatCampaignBenefit(row.template_code, row.parameters, row.campaign_name),
+            instruction_text: formatCampaignInstruction(row.template_code, row.parameters),
+          });
+        }
+      }
+    }
+
+    const shopsWithCampaigns = shops.map((shop) => ({
+      ...shop,
+      active_campaign: userCampaignsByShop.get(shop.shop_id) || null,
+    }));
+
+    // หากไม่มีการค้นหาคำ ให้จัดเรียงร้านที่ประชาชนมีสิทธิ์ใช้แคมเปญขึ้นก่อนเสมอ
+    if (!searchParamIdx) {
+      shopsWithCampaigns.sort((a, b) => {
+        const aActive = a.active_campaign ? 1 : 0;
+        const bActive = b.active_campaign ? 1 : 0;
+        if (bActive !== aActive) return bActive - aActive;
+        return (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime());
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      total: shops.length,
-      shops,
+      total: shopsWithCampaigns.length,
+      shops: shopsWithCampaigns,
     });
   } catch (error) {
     console.error('Get all shops error:', error);

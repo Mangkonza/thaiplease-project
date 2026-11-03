@@ -213,3 +213,71 @@ describe('PATCH /shops/:shopId/status', () => {
     assert.match(res.body.message, /10_shop_closure\.sql/);
   });
 });
+
+
+describe('GET /shops campaign highlights', () => {
+  test('returns active_campaign for treatment citizen', async () => {
+    mock.method(db, 'query', async (sql) => {
+      if (sql.includes('FROM shops WHERE status = $1')) {
+        return { rows: [{ shop_id: SHOP_ID, name: 'ร้าน A', status: 'ACTIVE' }] };
+      }
+      if (sql.includes('FROM shop_menu_items')) {
+        return { rows: [] };
+      }
+      if (sql.includes('FROM campaigns c')) {
+        return {
+          rows: [{
+            campaign_id: 'c1',
+            shop_id: SHOP_ID,
+            campaign_name: 'ส่วนลด 10%',
+            parameters: { discount_percent: 10 },
+            treatment_ratio: 0.5,
+            template_name: 'ส่วนลดเปอร์เซ็นต์',
+            template_code: 'PERCENT_DISCOUNT',
+            group_type: 'TREATMENT',
+          }],
+        };
+      }
+      return { rows: [] };
+    });
+
+    const res = await api.request('GET', '/api/v1/shops', { token: tokenFor('CITIZEN') });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.shops[0].active_campaign.campaign_id, 'c1');
+    assert.equal(res.body.shops[0].active_campaign.benefit_text, 'ลด 10%');
+  });
+
+  test('returns active_campaign null for control citizen or guest', async () => {
+    mock.method(db, 'query', async (sql) => {
+      if (sql.includes('FROM shops WHERE status = $1')) {
+        return { rows: [{ shop_id: SHOP_ID, name: 'ร้าน A', status: 'ACTIVE' }] };
+      }
+      if (sql.includes('FROM shop_menu_items')) {
+        return { rows: [] };
+      }
+      if (sql.includes('FROM campaigns c')) {
+        return {
+          rows: [{
+            campaign_id: 'c1',
+            shop_id: SHOP_ID,
+            campaign_name: 'ส่วนลด 10%',
+            parameters: { discount_percent: 10 },
+            treatment_ratio: 0.5,
+            template_name: 'ส่วนลดเปอร์เซ็นต์',
+            template_code: 'PERCENT_DISCOUNT',
+            group_type: 'CONTROL',
+          }],
+        };
+      }
+      return { rows: [] };
+    });
+
+    const res = await api.request('GET', '/api/v1/shops', { token: tokenFor('CITIZEN') });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.shops[0].active_campaign, null);
+
+    const guestRes = await api.request('GET', '/api/v1/shops');
+    assert.equal(guestRes.status, 200);
+    assert.equal(guestRes.body.shops[0].active_campaign, null);
+  });
+});

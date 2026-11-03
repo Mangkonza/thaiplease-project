@@ -1,18 +1,32 @@
 import { Link } from 'react-router-dom';
-import { Clock, MapPin } from 'lucide-react';
+import { Clock, MapPin, Sparkles } from 'lucide-react';
 import { imageSrc } from '../api';
 import { menuPriceText } from '../utils/shop-info';
 
 export default function ShopCard({ shop, index }) {
   const menu = shop.menu_preview || [];
+  const campaign = shop.active_campaign;
+
   return (
-    <Link className={`shop-card shop-color-${index % 4}`} to={`/shops/${shop.shop_id}`}>
+    <Link className={`shop-card shop-color-${index % 4}${campaign ? ' has-campaign' : ''}`} to={`/shops/${shop.shop_id}`}>
+      {campaign && (
+        <div className="shop-campaign-badge" title="คุณมีสิทธิ์เข้าร่วมแคมเปญร้านนี้">
+          <Sparkles size={12} aria-hidden="true" />
+          <span>แคมเปญพิเศษสำหรับคุณ</span>
+        </div>
+      )}
       <div className={shop.image_path ? 'shop-card-art has-image' : 'shop-card-art'}>
         {shop.image_path && <img src={imageSrc(shop.image_path)} alt="" loading="lazy" />}
         <span>{shop.category || 'LOCAL SHOP'}</span>
         {!shop.image_path && <b>{(shop.name || '?').slice(0, 1)}</b>}
       </div>
       <div className="shop-card-body">
+        {campaign && (
+          <div className="shop-campaign-callout">
+            <span className="campaign-chip">แคมเปญ</span>
+            <strong>{campaign.benefit_text ? `${campaign.benefit_text} (${campaign.name})` : campaign.name}</strong>
+          </div>
+        )}
         <span className="eyebrow">{shop.area || 'ใกล้คุณ'}</span>
         <h3>{shop.name}</h3>
         {menu.length > 0 ? (

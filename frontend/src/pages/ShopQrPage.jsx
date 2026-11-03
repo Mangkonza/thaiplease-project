@@ -3,8 +3,6 @@ import { useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import api, { getErrorMessage } from '../api';
 import ShopNav from '../components/ShopNav';
-import ShopImageUpload from '../components/ShopImageUpload';
-import ShopDetailsForm from '../components/ShopDetailsForm';
 import useCountdown from '../hooks/useCountdown';
 import { clockOffset, formatCountdown } from '../utils/countdown';
 import { formatBaht } from '../utils/format';
@@ -93,63 +91,116 @@ export default function ShopQrPage() {
 
   return (
     <div className="content-stack">
-      <div className="section-heading"><div><h1>{shop?.name || 'ร้านของฉัน'}</h1><p className="muted">รับเงินจากลูกค้าและข้อมูลหน้าร้าน</p></div></div>
+      <div className="section-heading">
+        <div>
+          <h1>{shop?.name || 'ร้านของฉัน'}</h1>
+          <p className="muted">สร้าง QR Code สำหรับรับเงินจากลูกค้า</p>
+        </div>
+      </div>
       <ShopNav shopId={shopId} section="qr" />
       {error && <p className="notice notice-error" role="alert">{error}</p>}
-      {shop && <div className="merchant-layout">
-        <section className="card qr-card">
-          <span className="eyebrow">RECEIVE PAYMENT</span>
-          {shop.status !== 'ACTIVE' && <p className="notice">ร้านยังไม่ได้รับอนุมัติ จึงยังรับเงินไม่ได้</p>}
+      {shop && (
+        <div style={{ maxWidth: '540px', margin: '0 auto', width: '100%' }}>
+          <section className="card qr-card">
+            <span className="eyebrow">RECEIVE PAYMENT</span>
+            {shop.status !== 'ACTIVE' && <p className="notice">ร้านยังไม่ได้รับอนุมัติ จึงยังรับเงินไม่ได้</p>}
 
-          {!payRequest && <form className="form-stack receive-form" onSubmit={createRequest}>
-            <h2>ใส่ยอดที่ต้องการเก็บ</h2>
-            <div className="quick-amounts">
-              {QUICK_AMOUNTS.map((value) => (
-                <button key={value} type="button" className={Number(amount) === value ? 'chip active' : 'chip'} onClick={() => setAmount(String(value))}>{value} บาท</button>
-              ))}
-            </div>
-            <label>ยอดเงิน (บาท)<input className="amount-input" type="number" min="0.01" step="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" /></label>
-            <button className="button button-primary button-wide" disabled={busy || !amount || shop.status !== 'ACTIVE'}>{busy ? 'กำลังสร้าง QR…' : 'สร้าง QR รับเงิน'}</button>
-            <p className="fine-print">ลูกค้าสแกนแล้วจ่ายตามยอดนี้ แก้ยอดเองไม่ได้ QR ใช้ได้ 5 นาทีและใช้ได้ครั้งเดียว</p>
-          </form>}
+            {!payRequest && (
+              <form className="form-stack receive-form" onSubmit={createRequest} style={{ width: '100%' }}>
+                <h2>ใส่ยอดที่ต้องการเก็บ</h2>
+                <div className="quick-amounts">
+                  {QUICK_AMOUNTS.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={Number(amount) === value ? 'chip active' : 'chip'}
+                      onClick={() => setAmount(String(value))}
+                    >
+                      {value} บาท
+                    </button>
+                  ))}
+                </div>
+                <label>
+                  ยอดเงิน (บาท)
+                  <input
+                    className="amount-input"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                    placeholder="0.00"
+                  />
+                </label>
+                <button
+                  className="button button-primary button-wide"
+                  disabled={busy || !amount || shop.status !== 'ACTIVE'}
+                >
+                  {busy ? 'กำลังสร้าง QR…' : 'สร้าง QR รับเงิน'}
+                </button>
+                <p className="fine-print">
+                  ลูกค้าสแกนแล้วจ่ายตามยอดนี้ แก้ยอดเองไม่ได้ QR ใช้ได้ 5 นาทีและใช้ได้ครั้งเดียว
+                </p>
+              </form>
+            )}
 
-          {pending && !expired && <>
-            <h2>{formatBaht(payRequest.amount)}</h2>
-            <span className={secondsLeft <= 60 ? 'countdown urgent' : 'countdown'}>หมดอายุใน {formatCountdown(secondsLeft)}</span>
-            {qr ? <img className="qr-image" src={qr} alt={`QR รับเงิน ${formatBaht(payRequest.amount)}`} /> : <p className="muted">กำลังสร้าง QR…</p>}
-            <p className="muted">ให้ลูกค้าเปิด "สแกนจ่าย" แล้วสแกน QR นี้ หน้านี้จะเปลี่ยนเองเมื่อลูกค้าจ่ายแล้ว</p>
-            <small className="muted qr-link">{payUrl}</small>
-            <button className="button button-outline" type="button" disabled={busy} onClick={cancelRequest}>ยกเลิก / แก้ยอด</button>
-          </>}
+            {pending && !expired && (
+              <>
+                <h2>{formatBaht(payRequest.amount)}</h2>
+                <span className={secondsLeft <= 60 ? 'countdown urgent' : 'countdown'}>
+                  หมดอายุใน {formatCountdown(secondsLeft)}
+                </span>
+                {qr ? (
+                  <img className="qr-image" src={qr} alt={`QR รับเงิน ${formatBaht(payRequest.amount)}`} />
+                ) : (
+                  <p className="muted">กำลังสร้าง QR…</p>
+                )}
+                <p className="muted">ให้ลูกค้าเปิด "สแกนจ่าย" แล้วสแกน QR นี้ หน้านี้จะเปลี่ยนเองเมื่อลูกค้าจ่ายแล้ว</p>
+                <small className="muted qr-link">{payUrl}</small>
+                <button
+                  className="button button-outline"
+                  type="button"
+                  disabled={busy}
+                  onClick={cancelRequest}
+                >
+                  ยกเลิก / แก้ยอด
+                </button>
+              </>
+            )}
 
-          {expired && <>
-            <span className="success-mark refunded">⌛</span>
-            <h2>QR หมดเวลาแล้ว</h2>
-            <p className="muted">ยังไม่มีการจ่าย {formatBaht(payRequest.amount)} สร้าง QR ใหม่เพื่อรับเงินอีกครั้ง</p>
-            <button className="button button-primary" type="button" onClick={startOver}>สร้าง QR ใหม่</button>
-          </>}
+            {expired && (
+              <>
+                <span className="success-mark refunded">⌛</span>
+                <h2>QR หมดเวลาแล้ว</h2>
+                <p className="muted">ยังไม่มีการจ่าย {formatBaht(payRequest.amount)} สร้าง QR ใหม่เพื่อรับเงินอีกครั้ง</p>
+                <button className="button button-primary" type="button" onClick={startOver}>
+                  สร้าง QR ใหม่
+                </button>
+              </>
+            )}
 
-          {payRequest?.status === 'PAID' && <>
-            <span className="success-mark">✓</span>
-            <h2>รับเงินแล้ว {formatBaht(payRequest.payment?.gross_amount ?? payRequest.amount)}</h2>
-            {payRequest.payment && <dl className="receipt-list">
-              <div><dt>ลูกค้าจ่าย</dt><dd>{formatBaht(payRequest.payment.citizen_paid)}</dd></div>
-              <div><dt>รัฐช่วยจ่าย</dt><dd>{formatBaht(payRequest.payment.government_subsidy)}</dd></div>
-              {payRequest.payment.coupon_discount > 0 && <div><dt>คูปอง (โครงการจ่ายให้ร้าน)</dt><dd>{formatBaht(payRequest.payment.coupon_discount)}</dd></div>}
-            </dl>}
-            <button className="button button-primary" type="button" onClick={startOver}>รับเงินรายการถัดไป</button>
-          </>}
-        </section>
-        <section className="card form-stack">
-          <span className="eyebrow">STOREFRONT</span>
-          <h2>รูปหน้าร้าน</h2>
-          <p className="muted">รูปนี้แสดงในหน้าร้านแนะนำ หน้าร้าน และหน้าจ่ายเงินของลูกค้า</p>
-          <ShopImageUpload shop={shop} onUploaded={(imagePath) => setShop({ ...shop, image_path: imagePath })} />
-          <h2 className="section-gap">ข้อมูลร้านสำหรับลูกค้า</h2>
-          <p className="muted">ที่อยู่ เวลาเปิด และสินค้าที่ขาย แสดงในหน้าร้านแนะนำ</p>
-          <ShopDetailsForm shop={shop} />
-        </section>
-      </div>}
+            {payRequest?.status === 'PAID' && (
+              <>
+                <span className="success-mark">✓</span>
+                <h2>รับเงินแล้ว {formatBaht(payRequest.payment?.gross_amount ?? payRequest.amount)}</h2>
+                {payRequest.payment && (
+                  <dl className="receipt-list">
+                    <div><dt>ลูกค้าจ่าย</dt><dd>{formatBaht(payRequest.payment.citizen_paid)}</dd></div>
+                    <div><dt>รัฐช่วยจ่าย</dt><dd>{formatBaht(payRequest.payment.government_subsidy)}</dd></div>
+                    {payRequest.payment.coupon_discount > 0 && (
+                      <div><dt>คูปอง (โครงการจ่ายให้ร้าน)</dt><dd>{formatBaht(payRequest.payment.coupon_discount)}</dd></div>
+                    )}
+                  </dl>
+                )}
+                <button className="button button-primary" type="button" onClick={startOver}>
+                  รับเงินรายการถัดไป
+                </button>
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

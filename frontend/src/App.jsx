@@ -16,6 +16,7 @@ import ScanPage from './pages/ScanPage';
 import WalletPage from './pages/WalletPage';
 import SlipPage from './pages/SlipPage';
 import ShopQrPage from './pages/ShopQrPage';
+import ShopManagePage from './pages/ShopManagePage';
 import { homePathFor } from './utils/payment-links';
 
 function ProtectedRoute({ roles, children }) {
@@ -28,54 +29,63 @@ function ProtectedRoute({ roles, children }) {
 }
 
 // เข้าระบบแล้วไปหน้าที่ตั้งใจเปิดไว้ก่อนถูกพามา login หรือหน้าแรกของบทบาท
-// ต้องเปลี่ยนหน้าจากที่นี่ที่เดียว ถ้า AuthPage สั่ง navigate เองด้วย สองคำสั่งจะแข่งกันและหน้านี้ชนะ
 function LoginRoute() {
   const { user } = useAuth();
-  const from = useLocation().state?.from;
-  return user ? <Navigate to={from || homePathFor(user)} replace /> : <AuthPage />;
+  const location = useLocation();
+  if (user) return <Navigate to={location.state?.from || homePathFor(user)} replace />;
+  return <AuthPage />;
 }
 
-// ลิงก์ใน QR รับเงิน พาไปหน้าจ่ายคำขอรับเงินที่ร้านใส่ยอดไว้
+// ลูกค้าสแกน QR ร้านแล้วเข้าลิงก์ /pay/:requestId ให้พาไปหน้าสรุปยอดเพื่อจ่าย
 function PayLink() {
   const { requestId } = useParams();
   return <Navigate to={`/checkout/${requestId}`} replace />;
 }
 
-// สแกนจ่ายและเติมเงินอยู่บนการ์ดกระเป๋าเงินในหน้าแรก จึงไม่อยู่ในเมนู
-const NAV_LINKS = {
-  CITIZEN: [['/home', 'หน้าแรก', House], ['/shops', 'ร้านแนะนำ', Store], ['/wallet', 'กระเป๋าเงิน', Wallet], ['/coins', 'เหรียญของฉัน', Coins]],
-  MERCHANT: [['/merchant/shops', 'จัดการร้าน', Store]],
-  ADMIN: [['/admin/shops', 'ผู้ดูแลระบบ', ShieldCheck]],
-};
-
 export default function App() {
-  const { user, signOut } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const citizen = (page) => <ProtectedRoute roles={['CITIZEN']}>{page}</ProtectedRoute>;
-  const merchant = (page) => <ProtectedRoute roles={['MERCHANT']}>{page}</ProtectedRoute>;
 
-  function logout() {
-    signOut();
+  function onLogout() {
+    logout();
     navigate('/login');
   }
 
+  const roleNav = {
+    CITIZEN: [['/home', 'หน้าแรก', House], ['/shops', 'ร้านแนะนำ', Store], ['/wallet', 'กระเป๋าเงิน', Wallet], ['/coins', 'เหรียญของฉัน', Coins]],
+    MERCHANT: [['/merchant/shops', 'จัดการร้าน', Store]],
+    ADMIN: [['/admin/shops', 'ระบบ', ShieldCheck]],
+  };
+
+  const navItems = user ? roleNav[user.role] || [] : [];
+  const citizen = (page) => <ProtectedRoute roles={['CITIZEN']}>{page}</ProtectedRoute>;
+  const merchant = (page) => <ProtectedRoute roles={['MERCHANT']}>{page}</ProtectedRoute>;
+
   return (
-    <div className={user?.role === 'CITIZEN' ? 'app-shell has-tabbar' : 'app-shell'}>
+    <div className="app-shell">
       <header className="topbar">
-        <Link className="brand" to={homePathFor(user)}><span className="brand-mark">ท</span> ThaiPlease</Link>
+        <Link className="brand" to="/">
+          <span className="brand-mark">n</span>ThaiPlease
+        </Link>
         <nav className="nav-links">
-          {(NAV_LINKS[user?.role] || []).map(([to, label, Icon]) => <NavLink key={to} to={to}><Icon size={16} />{label}</NavLink>)}
+          {navItems.map(([path, label, Icon]) => (
+            <NavLink key={path} to={path} className={({ isActive }) => (isActive ? 'active' : '')}>
+              <Icon size={16} aria-hidden="true" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
         </nav>
         <div className="account-actions">
           {user ? (
             <>
               <span className="user-name">{user.display_name || user.email}</span>
-              <button className="button button-quiet" onClick={logout}>ออกจากระบบ</button>
+              <button className="button button-quiet button-small" onClick={onLogout}>ออกจากระบบ</button>
             </>
-          ) : <Link className="button button-primary" to="/login">เข้าสู่ระบบ</Link>}
+          ) : (
+            <Link className="button button-primary button-small" to="/login">เข้าสู่ระบบ</Link>
+          )}
         </div>
       </header>
-
       <main className="page-wrap">
         <Routes>
           <Route path="/" element={<Navigate to={homePathFor(user)} replace />} />
@@ -91,6 +101,7 @@ export default function App() {
           <Route path="/merchant/shops" element={merchant(<MerchantShopsPage />)} />
           <Route path="/merchant/shops/:shopId/dashboard" element={merchant(<ShopDashboardPage />)} />
           <Route path="/merchant/shops/:shopId/qr" element={merchant(<ShopQrPage />)} />
+          <Route path="/merchant/shops/:shopId/manage" element={merchant(<ShopManagePage />)} />
           <Route path="/merchant/shops/:shopId/campaigns" element={merchant(<CampaignsPage />)} />
           <Route path="/merchant/shops/:shopId/campaigns/:campaignId" element={merchant(<CampaignResultPage />)} />
           <Route path="/admin/shops" element={<ProtectedRoute roles={['ADMIN']}><AdminPage /></ProtectedRoute>} />
