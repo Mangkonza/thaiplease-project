@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Clock, MapPin, Navigation } from 'lucide-react';
+import { Clock, MapPin, Navigation, Sparkles } from 'lucide-react';
 import api, { getErrorMessage, imageSrc } from '../api';
 import { mapsUrl, menuPriceText } from '../utils/shop-info';
 
@@ -20,6 +20,7 @@ export default function ShopPage() {
 
   const mapLink = mapsUrl(shop);
   const menu = shop.menu_items || [];
+  const campaign = shop.active_campaign;
 
   return (
     <div className="content-stack">
@@ -34,13 +35,41 @@ export default function ShopPage() {
           <span className="eyebrow">{shop.area || 'ร้านค้าในชุมชน'}</span>
           <h1>{shop.name}</h1>
           <p>{shop.description || 'ร้านค้าที่พร้อมให้บริการและต้อนรับคุณ'}</p>
-          <div className="store-meta"><span>หมวดหมู่ <strong>{shop.category || 'ทั่วไป'}</strong></span><span>พื้นที่ <strong>{shop.area || 'ไม่ระบุ'}</strong></span></div>
+          <div className="store-meta">
+            <span>หมวดหมู่ <strong>{shop.category || 'ทั่วไป'}</strong></span>
+            <span>พื้นที่ <strong>{shop.area || 'ไม่ระบุ'}</strong></span>
+          </div>
           <div className="button-row">
             <Link className="button button-primary" to="/scan">สแกนจ่ายที่ร้าน <span>→</span></Link>
             {mapLink && <a className="button button-outline" href={mapLink} target="_blank" rel="noopener noreferrer"><Navigation size={15} /> เปิดใน Google Maps</a>}
           </div>
         </div>
       </section>
+
+      {campaign && (
+        <section className="card shop-campaign-spotlight">
+          <div className="campaign-spotlight-header">
+            <div className="campaign-chip-spotlight">
+              <Sparkles size={14} aria-hidden="true" />
+              <span>แคมเปญพิเศษสำหรับคุณ</span>
+            </div>
+            {campaign.benefit_text && (
+              <span className="campaign-spotlight-benefit">{campaign.benefit_text}</span>
+            )}
+          </div>
+          <h2 className="campaign-spotlight-title">{campaign.name}</h2>
+          <div className="campaign-spotlight-body">
+            <p className="campaign-instruction">
+              <strong>วิธีเข้าร่วม:</strong> {campaign.instruction_text}
+            </p>
+            {campaign.start_at && campaign.end_at && (
+              <small className="muted campaign-duration">
+                ระยะเวลา: {new Date(campaign.start_at).toLocaleDateString('th-TH')} – {new Date(campaign.end_at).toLocaleDateString('th-TH')}
+              </small>
+            )}
+          </div>
+        </section>
+      )}
 
       <div className="shop-info-grid">
         <section className="card">

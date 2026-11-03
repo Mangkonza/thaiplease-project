@@ -1,4 +1,4 @@
-// คำนวณยอดตาม D-12: ยอดเต็ม → ส่วนลดแคมเปญ (ร้านออก) → คูปอง (รัฐออก) → รัฐช่วยจ่าย → ประชาชนจ่าย
+// คำนวณยอด: ยอดเต็มแบ่ง 60/40 ก่อน → ส่วนลดแคมเปญร้านค้าและคูปองลดในส่วน 40% ที่ประชาชนจ่ายเอง → ประชาชนจ่ายจริง
 // เป็น pure function เพื่อ test ได้โดยไม่ต้องมี DB
 
 const TIME_ZONE = 'Asia/Bangkok';
@@ -28,10 +28,6 @@ function isWithinProgram(policy, paidAt) {
  */
 function calculateCheckout({ grossAmount, campaignDiscount = 0, couponDiscount = 0, policy, usage, paidAt }) {
   const gross = toSatang(grossAmount);
-  const campaign = Math.min(gross, Math.max(0, toSatang(campaignDiscount)));
-  const shopReceives = gross - campaign;
-  const coupon = Math.min(shopReceives, Math.max(0, toSatang(couponDiscount)));
-  const afterCoupon = shopReceives - coupon;
 
   let subsidy = 0;
   let remaining = null;
@@ -47,12 +43,26 @@ function calculateCheckout({ grossAmount, campaignDiscount = 0, couponDiscount =
     if (!isWithinProgram(policy, paidAt)) {
       subsidyReason = 'OUTSIDE_PROGRAM';
     } else {
-      const wanted = Math.round(afterCoupon * Number(policy.copay_percent) / 100);
+      // แบ่ง 60/40 จากยอดเต็มก่อน
+      const wanted = Math.round(gross * Number(policy.copay_percent) / 100);
       const capLeft = Math.min(remaining.today, remaining.month, remaining.total);
       subsidy = Math.min(wanted, capLeft);
       subsidyReason = subsidy < wanted ? 'CAP_REACHED' : 'APPLIED';
     }
   }
+
+  // ส่วน 40% ที่ประชาชนต้องจ่ายก่อนหักส่วนลด
+  const citizenShare = Math.max(0, gross - subsidy);
+
+  // นำส่วนลดแคมเปญร้านค้าและคูปองมาลดในส่วน 40% ที่ประชาชนต้องจ่ายเอง
+  const campaign = Math.min(citizenShare, Math.max(0, toSatang(campaignDiscount)));
+  const afterCampaign = citizenShare - campaign;
+
+  const coupon = Math.min(afterCampaign, Math.max(0, toSatang(couponDiscount)));
+  const citizenPaid = afterCampaign - coupon;
+
+  // ร้านค้าได้รับเงิน = ยอดเต็มหักส่วนลดที่ร้านออกเอง
+  const shopReceives = gross - campaign;
 
   return {
     gross_amount: toBaht(gross),
@@ -60,7 +70,7 @@ function calculateCheckout({ grossAmount, campaignDiscount = 0, couponDiscount =
     shop_receives: toBaht(shopReceives),
     coupon_discount: toBaht(coupon),
     government_subsidy: toBaht(subsidy),
-    citizen_paid: toBaht(afterCoupon - subsidy),
+    citizen_paid: toBaht(citizenPaid),
     policy_version: policy ? policy.policy_version : null,
     subsidy_status: subsidyReason,
     subsidy_remaining: remaining && {

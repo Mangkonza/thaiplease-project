@@ -46,6 +46,18 @@ export default function HomePage() {
   const { wallet, subsidy, coins, shops } = data;
   const { policy } = subsidy;
 
+  // เลือกร้านแนะนำในหน้าแรกสุด: จัดเรียงร้านที่ประชาชนมีสิทธิ์ใช้แคมเปญขึ้นมาก่อนเสมอ
+  const recommendedShops = [...(shops || [])].sort((a, b) => {
+    const aActive = a.active_campaign ? 1 : 0;
+    const bActive = b.active_campaign ? 1 : 0;
+    if (bActive !== aActive) return bActive - aActive;
+    return 0;
+  });
+
+  const campaignCount = recommendedShops.filter((s) => Boolean(s.active_campaign)).length;
+  const displayLimit = Math.max(PREVIEW_SHOPS, campaignCount);
+  const displayShops = recommendedShops.slice(0, displayLimit);
+
   return (
     <div className="content-stack home-page">
       <header className="home-greeting">
@@ -88,9 +100,9 @@ export default function HomePage() {
         </div>
         <Link className="button button-outline button-small" to="/shops">ดูทั้งหมด <ArrowUpRight size={14} /></Link>
       </div>
-      {shops.length ? (
+      {displayShops.length ? (
         <div className="shop-grid shop-grid-four">
-          {shops.slice(0, PREVIEW_SHOPS).map((shop, index) => <ShopCard key={shop.shop_id} shop={shop} index={index} />)}
+          {displayShops.map((shop, index) => <ShopCard key={shop.shop_id} shop={shop} index={index} />)}
         </div>
       ) : <p className="empty-note">ยังไม่มีร้านที่เปิดให้บริการ</p>}
     </div>

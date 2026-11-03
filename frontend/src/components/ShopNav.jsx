@@ -5,10 +5,11 @@ import api from '../api';
 const SECTIONS = [
   { key: 'dashboard', label: 'ยอดขายและ AI' },
   { key: 'campaigns', label: 'แคมเปญ' },
-  { key: 'qr', label: 'รับเงิน / หน้าร้าน' },
+  { key: 'qr', label: 'QR รับเงิน' },
+  { key: 'manage', label: 'จัดการร้าน' },
 ];
 
-// แถบเมนูของร้าน: สลับยอดขาย/แคมเปญ และสลับร้านสำหรับเจ้าของที่มีหลายร้าน
+// แถบเมนูของร้าน: สลับยอดขาย/แคมเปญ/QR/จัดการร้าน และสลับร้านสำหรับเจ้าของที่มีหลายร้าน
 export default function ShopNav({ shopId, section }) {
   const navigate = useNavigate();
   const [shops, setShops] = useState([]);

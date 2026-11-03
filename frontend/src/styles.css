@@ -453,3 +453,178 @@ textarea { resize: vertical; }
 @media (max-width: 560px) { .compare-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .detail-sheet { padding: 18px; } }
 .analytics-card td, .detail-sheet td { white-space: nowrap; }
 @media (max-width: 1000px) { .admin-overview > .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+
+/* ไฮไลท์การ์ดร้านค้าที่มีแคมเปญที่เข้าร่วมได้ */
+.shop-card.has-campaign {
+  border: 2px solid #8b5cf6;
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.25), 0 8px 24px rgba(139, 92, 246, 0.12);
+  position: relative;
+}
+
+.shop-card.has-campaign:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 2px #7c3aed, 0 14px 30px rgba(124, 58, 237, 0.22);
+}
+
+.shop-campaign-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+  letter-spacing: 0.3px;
+}
+
+.shop-campaign-callout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  font-size: 12px;
+  color: #6d28d9;
+}
+
+.shop-campaign-callout .campaign-chip {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #7c3aed;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.shop-campaign-callout strong {
+  font-weight: 600;
+  color: #5b21b6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-campaign-badge.shop-campaign-badge-general {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+}
+
+.shop-campaign-callout-general {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.shop-campaign-callout .campaign-chip.campaign-chip-general {
+  background: #16a34a;
+}
+
+.shop-campaign-callout-general strong {
+  color: #166534;
+}
+
+
+/* การ์ดรายละเอียดแคมเปญในหน้าร้าน */
+.shop-campaign-spotlight {
+  background: linear-gradient(135deg, #fdf4ff 0%, #f5f3ff 50%, #eff6ff 100%);
+  border: 2px solid #8b5cf6;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.12);
+  padding: 24px;
+}
+
+.campaign-spotlight-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.campaign-chip-spotlight {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+.campaign-spotlight-benefit {
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.campaign-spotlight-title {
+  margin: 0 0 10px;
+  font-size: 22px;
+  color: #4c1d95;
+}
+
+.campaign-spotlight-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.campaign-instruction {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #374151;
+}
+
+.campaign-instruction strong {
+  color: #6d28d9;
+}
+
+.campaign-duration {
+  font-size: 12px;
+}
+
+.shop-campaign-spotlight.shop-campaign-spotlight-general {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdfa 100%);
+  border-color: #10b981;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.12);
+}
+
+.campaign-chip-spotlight.campaign-chip-spotlight-general {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+.campaign-spotlight-benefit.campaign-spotlight-benefit-general {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.shop-campaign-spotlight-general .campaign-spotlight-title {
+  color: #065f46;
+}
+
+.shop-campaign-spotlight-general .campaign-instruction strong {
+  color: #059669;
+}

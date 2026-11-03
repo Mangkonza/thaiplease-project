@@ -20,20 +20,38 @@ describe('calculateCheckout (D-12)', () => {
     assert.deepEqual(result.subsidy_remaining, { today: 140, month: 1940, total: 7940 });
   });
 
-  test('campaign discount comes off first and the shop absorbs it', () => {
+  test('splits 60/40 first, then campaign discount reduces the citizen 40% share', () => {
     const result = calculateCheckout({ grossAmount: 200, campaignDiscount: 20, policy: POLICY, usage: NO_USAGE, paidAt: PAID_AT });
     assert.equal(result.campaign_discount, 20);
     assert.equal(result.shop_receives, 180);
-    assert.equal(result.government_subsidy, 108);
-    assert.equal(result.citizen_paid, 72);
+    assert.equal(result.government_subsidy, 120);
+    assert.equal(result.citizen_paid, 60);
   });
 
-  test('coupon comes off before the 60% is applied', () => {
+  test('splits 60/40 first on 200 gross, then deducts both 20 campaign and 20 coupon from citizen 40% share', () => {
+    const result = calculateCheckout({ grossAmount: 200, campaignDiscount: 20, couponDiscount: 20, policy: POLICY, usage: NO_USAGE, paidAt: PAID_AT });
+    assert.equal(result.gross_amount, 200);
+    assert.equal(result.government_subsidy, 120);
+    assert.equal(result.campaign_discount, 20);
+    assert.equal(result.coupon_discount, 20);
+    assert.equal(result.citizen_paid, 40);
+    assert.equal(result.shop_receives, 180);
+  });
+
+  test('splits 60/40 first, then coupon reduces the citizen 40% share (150 gross, 20 coupon)', () => {
     const result = calculateCheckout({ grossAmount: 150, couponDiscount: 20, policy: POLICY, usage: NO_USAGE, paidAt: PAID_AT });
     assert.equal(result.shop_receives, 150);
     assert.equal(result.coupon_discount, 20);
-    assert.equal(result.government_subsidy, 78);
-    assert.equal(result.citizen_paid, 52);
+    assert.equal(result.government_subsidy, 90);
+    assert.equal(result.citizen_paid, 40);
+  });
+
+  test('splits 60/40 first on 200 gross, then deducts 20 coupon from the 40% citizen share', () => {
+    const result = calculateCheckout({ grossAmount: 200, couponDiscount: 20, policy: POLICY, usage: NO_USAGE, paidAt: PAID_AT });
+    assert.equal(result.shop_receives, 200);
+    assert.equal(result.government_subsidy, 120);
+    assert.equal(result.coupon_discount, 20);
+    assert.equal(result.citizen_paid, 60);
   });
 
   test('daily cap of 200 baht limits the subsidy', () => {
@@ -90,7 +108,7 @@ describe('calculateCheckout (D-12)', () => {
 
   test('discounts never exceed the amount due', () => {
     const result = calculateCheckout({ grossAmount: 50, campaignDiscount: 80, couponDiscount: 20, policy: POLICY, usage: NO_USAGE, paidAt: PAID_AT });
-    assert.equal(result.campaign_discount, 50);
+    assert.equal(result.campaign_discount, 20);
     assert.equal(result.coupon_discount, 0);
     assert.equal(result.citizen_paid, 0);
   });
